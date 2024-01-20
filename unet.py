@@ -73,7 +73,7 @@ class OutConv(nn.Module):
 
 
 class UNet2(pl.LightningModule):
-    def __init__(self, n_channels):
+    def __init__(self, n_channels,n_out_channels):
         super(UNet2, self).__init__()
         self.save_hyperparameters()
         self.learning_rate = 0.0001
@@ -84,15 +84,15 @@ class UNet2(pl.LightningModule):
         self.down2 = (Down(128, 256))
         self.down3 = (Down(256, 512))
         self.down4 = (Down(512, 1024))
-        self.down5 = (Down(1024, 2048))
-        self.down6 = Down(2048,4096)
-        self.up1 = Up(4096,2048)
-        self.up2 = (Up(2048,1024))
+        #self.down5 = (Down(1024, 2048))
+        #self.down6 = Down(2048,4096)
+        #self.up1 = Up(4096,2048)
+        #self.up2 = (Up(2048,1024))
         self.up3 = (Up(1024, 512))
         self.up4 = (Up(512, 256))
         self.up5 = (Up(256, 128))
         self.up6 = (Up(128, 64))
-        self.outc = (OutConv(64, n_channels))
+        self.outc = (OutConv(64, n_out_channels))
         self.loss = torch.nn.MSELoss()
       #  self.precision = torchmetrics.Precision(task='multiclass',average='macro',num_classes=n_classes)
       #  self.recall = torchmetrics.Recall(task='multiclass',average='macro',num_classes=n_classes)
@@ -104,10 +104,10 @@ class UNet2(pl.LightningModule):
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         x5 = self.down4(x4)
-        x6 = self.down5(x5)
-        x7 = self.down6(x6)
-        x = self.up1(x7, x6)
-        x = self.up2(x6, x5)
+        #x6 = self.down5(x5)
+        #x7 = self.down6(x6)
+        #x = self.up1(x7, x6)
+        #x = self.up2(x6, x5)
         x = self.up3(x5, x4)
         x = self.up4(x, x3)
         x = self.up5(x, x2)
@@ -121,7 +121,7 @@ class UNet2(pl.LightningModule):
         logits = self.forward(x)
         loss = self.loss(logits, y)
         #acc = (logits.argmax(dim=1) == y).float().mean()
-        self.log('training loss', loss, on_epoch=True,on_step=False,prog_bar=True)
+        self.log('training loss', loss, on_epoch=True,on_step=True,prog_bar=True)
         #self.log('train accuracy',acc,on_epoch=True,on_step=False)
         # self.log('train balanced acc',balanced_accuracy_score(y,logits.argmax(dim=1),self.n_classes),on_epoch=True)
         # self.log('train precision',self.precision(logits,y),on_step=False,on_epoch=True)
@@ -134,7 +134,7 @@ class UNet2(pl.LightningModule):
         logits = self.forward(x)
         loss = self.loss(logits, y)
         #acc = (logits.argmax(dim=1) == y).float().mean()
-        self.log('validation loss', loss, on_step=False,on_epoch=True,prog_bar=True)
+        self.log('validation loss', loss, on_step=True,on_epoch=True,prog_bar=True)
        # self.log('validation accuracy',acc,on_step=False,on_epoch=True)
        # self.log('valid balanced acc',balanced_accuracy_score(y,logits.argmax(dim=1),self.confmat),on_epoch=True)
         # self.log('validation recall',self.recall(logits,y),on_step=False,on_epoch=True)
@@ -152,7 +152,7 @@ class UNet2(pl.LightningModule):
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
 
-#    def predict_step(self, batch, batch_idx, dataloader_idx=0):
-#        x,y = batch
-#        predictions = self.forward(x)
-#        return predictions,y
+    def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        predictions = self.forward(batch['inputs'])
+        y = batch['targets']
+        return predictions,y

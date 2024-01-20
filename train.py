@@ -4,7 +4,7 @@ import torch
 from unet import UNet2
 from lightning.pytorch.callbacks import ModelCheckpoint
 import os 
-from ipsl_dataset import input_variables
+from ipsl_dataset import input_variables,target_variables
 import lightning.pytorch as pl
 from lightning.pytorch.callbacks import DeviceStatsMonitor
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -13,14 +13,14 @@ from lightning.pytorch.loggers import TensorBoardLogger
 def main():
     scratch = os.environ['SCRATCH']
     wandb_logger = WandbLogger(project="unet_ipsl_autoregression")
-    logger = TensorBoardLogger("tb_logs", name="my_model")
+    #logger = TensorBoardLogger("tb_logs", name="my_model")
 
     train = IPSL_DCPP('train')
     val = IPSL_DCPP('val')
-    train_dataloader = torch.utils.data.DataLoader(train,batch_size=4,shuffle=True,num_workers=3)
-    val_dataloader = torch.utils.data.DataLoader(val,batch_size=1,shuffle=False,num_workers=3)
+    train_dataloader = torch.utils.data.DataLoader(train,batch_size=32,shuffle=True,num_workers=2)
+    val_dataloader = torch.utils.data.DataLoader(val,batch_size=1,shuffle=False,num_workers=2)
 
-    regressor = UNet2(n_channels=len(input_variables))
+    regressor = UNet2(n_channels=len(input_variables),n_out_channels=len(target_variables))
     checkpoint_callback = ModelCheckpoint(
         filename=wandb_logger.experiment.name+"_{epoch:02d}",
         every_n_epochs=2,
@@ -33,10 +33,13 @@ def main():
         max_epochs=10,
         callbacks=[checkpoint_callback],default_root_dir=f"{scratch}/checkpoint_{wandb_logger.experiment.name}",
         enable_checkpointing=True,
-        log_every_n_steps=10,
+        log_every_n_steps=1,
         min_epochs=5,
-        logger=logger,
+        logger=wandb_logger,
         precision="16-mixed",
+        devices=2,
+        strategy='ddp_find_unused_parameters_true',
+        accelerator="gpu"
     )
     trainer.fit(
         model=regressor, 
