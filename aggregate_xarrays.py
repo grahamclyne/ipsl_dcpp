@@ -39,7 +39,7 @@ def convert_to_joined_numpy(year,variation):
 #import matplotlib.pyplot as plt
 #plt.hist(ds_numpy[variable_list.index('tasmax')].flatten())
 if __name__ == "__main__":
-    for year in range(1964,2000):
+    for year in range(1984,2020):
         for variation in range(1,11):
             print(year,variation)
             convert_to_joined_numpy(year,variation)

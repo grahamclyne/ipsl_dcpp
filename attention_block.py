@@ -377,11 +377,7 @@ class EarthSpecificBlock(nn.Module):
     def forward(self, x: torch.Tensor, dt=1):
         Pl, Lat, Lon = self.input_resolution
         B, L, C = x.shape
-        print('in earth specific block')
-        print('input resol',self.input_resolution)
-        print('x shape',x.shape)
-        import psutil 
-        print('RAM Used (GB):', psutil.virtual_memory()[3]/1000000000)
+
 
         assert L == Pl * Lat * Lon, "input feature has wrong size"
 

@@ -1,0 +1,22 @@
+name: '6_month_lead_time_with_atmos_plev_and_surface_only'
+learning_rate: 0.0001
+num_cpus: 2
+train_batch_size: 4
+val_batch_size: 1
+max_epochs: 10
+max_steps: 1000000
+seed: 0
+train_dataset:
+  _target_: ipsl_dataset.IPSL_DCPP
+  domain: train
+
+val_dataset:
+  _target_: ipsl_dataset.IPSL_DCPP
+  domain: val
+  
+module:
+  _target_: forecast.ForecastModule
+
+backbone:
+  _target_: pangu.PanguWeather
+    
