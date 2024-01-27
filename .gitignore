@@ -163,3 +163,6 @@ data/
 wandb/
 *.err
 *.out
+outputs/
+lightning_logs/
+ipsl_dcpp_emulation/

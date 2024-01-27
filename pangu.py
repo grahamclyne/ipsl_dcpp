@@ -188,8 +188,8 @@ class PanguWeather(nn.Module):
                  lon_resolution=144,
                  lat_resolution=143,
                  emb_dim=192, 
-                 #num_heads=(6, 12, 12, 6),
-                 num_heads=(1,1,1,1),
+                 num_heads=(6, 12, 12, 6),
+                 #num_heads=(1,1,1,1),
                  patch_size=(2, 4, 4),
                  two_poles=False,
                  window_size=(2, 6, 12), 
@@ -267,7 +267,7 @@ class PanguWeather(nn.Module):
             drop_path=drop_path[:2*depth_multiplier]
         )
         # The outputs of the 2nd encoder layer and the 7th decoder layer are concatenated along the channel dimension.
-        self.patchrecovery2d = PatchRecovery2D((lat_resolution, lon_resolution), patch_size[1:], out_dim, 4)
+        self.patchrecovery2d = PatchRecovery2D((lat_resolution, lon_resolution), patch_size[1:], out_dim, surface_ch)
         self.patchrecovery3d = PatchRecovery3D((19, lat_resolution, lon_resolution), patch_size, out_dim, level_ch)
      #   if conv_head:
      #       self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=69, downfactor=patch_size[-1])
@@ -323,17 +323,17 @@ class PanguWeather(nn.Module):
         if not self.conv_head:
             output_surface = output[:, :, 0, :, :]
             output_upper_air = output[:, :, 1:, :, :]
-            #print('output_surface_shape',output_surface.shape)
+           # print('output_surface_shape',output_surface.shape)
            # print('output_upper_air',output_upper_air.shape)
             output_surface = self.patchrecovery2d(output_surface)
             output_level = self.patchrecovery3d(output_upper_air)
             
-            output_surface = output_surface.unsqueeze(-3)
+            #output_surface = output_surface.unsqueeze(-3)
             
         else:
             output_level, output_surface = self.patchrecovery(output)
        # print('output_level',output_level.shape)
-       # print('output_surface',output_surface.shape)
+      #  print('output_surface',output_surface.shape)
         out = dict(latent=latent,
                    next_state_level=output_level, 
                     next_state_surface=output_surface)

@@ -1,9 +1,9 @@
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch.nn as nn
 import torch
 import diffusers
 from pathlib import Path
-
+from ipsl_dataset import surface_variables
 lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
 lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
 
@@ -51,7 +51,7 @@ class ForecastModule(pl.LightningModule):
         mode = 'train_' if self.training else 'val_'
         dct.update(kwargs)
         for k, v in dct.items():
-            self.log(mode+k, v, prog_bar=True)
+            self.log(mode+k, v, prog_bar=True,sync_dist=True)
             
     def loss(self, pred, batch, lat_coeffs=lat_coeffs_equi):
         device = batch['next_state_surface'].device
@@ -92,6 +92,10 @@ class ForecastModule(pl.LightningModule):
         
     def validation_step(self, batch, batch_nb):
         pred = self.forward(batch)
+       # print(pred['next_state_level'].shape)
+       # print(pred['next_state_surface'].shape)
+       # print(batch['state_level'].shape)
+       # print(batch['state_surface'].shape)
         _, _, loss = self.loss(pred, batch)
         self.mylog(loss=loss)
         # to compare with batch['next_state_level']...
@@ -101,21 +105,48 @@ class ForecastModule(pl.LightningModule):
         mse_level = mse_level.cpu().mean((-2, -1)).sqrt().mean(0)
         mse_surface = mse_surface.cpu().mean((-3, -2, -1)).sqrt().mean(0)
 
-        headline = (mse_level[0, 7]/100 + mse_level[3, 10] + mse_level[4, 9] 
-                + (mse_level[1, 9] + mse_level[2, 9])/3/2**.5
-                + mse_surface[2] + mse_surface[0] + mse_surface[3]/100)/7
+        #headline = (mse_level[0, 7]/100 + mse_level[3, 10] + mse_level[4, 9] 
+        #        + (mse_level[1, 9] + mse_level[2, 9])/3/2**.5
+        #        + mse_surface[2] + mse_surface[0] + mse_surface[3]/100)/7
 
     
-        self.mylog(batch_size=pred['next_state_level'].shape[0]*1.0,
-                          z500=mse_level[0, 7],  
-                           t850=mse_level[3, 10], 
-                           t2m=mse_surface[2], 
-                           u10=mse_surface[0],
-                           msl=mse_surface[3],
-                           headline=headline)
+        self.mylog(batch_size=pred['next_state_level'].shape[0]*1.0)
+                        #  gpp=surface_variables.index('gpp'),  
+                        #   npp=surface_variables.index('npp'), 
+                        #   nep=surface_variables.index('nep'))
+                          # headline=headline)
         return loss
 
+    def predict_step(self,batch,batch_nb):
+        pred = self.forward(batch)
+        print('here!')
+        pred, batch = self.dataset.denormalize(pred, batch)
 
+       # print(pred['next_state_level'].shape)
+       # print(pred['next_state_surface'].shape)
+       # print(batch['state_level'].shape)
+       # print(batch['state_surface'].shape)
+       # _, _, loss = self.loss(pred, batch)
+       # self.mylog(loss=loss)
+        # to compare with batch['next_state_level']...
+       # pred, batch = self.dataset.denormalize(pred, batch)
+       # mse_surface, mse_level, _ = self.loss(pred, batch)
+
+       # mse_level = mse_level.cpu().mean((-2, -1)).sqrt().mean(0)
+       # mse_surface = mse_surface.cpu().mean((-3, -2, -1)).sqrt().mean(0)
+
+        #headline = (mse_level[0, 7]/100 + mse_level[3, 10] + mse_level[4, 9] 
+        #        + (mse_level[1, 9] + mse_level[2, 9])/3/2**.5
+        #        + mse_surface[2] + mse_surface[0] + mse_surface[3]/100)/7
+
+    
+        #self.mylog(batch_size=pred['next_state_level'].shape[0]*1.0)
+                        #  gpp=surface_variables.index('gpp'),  
+                        #   npp=surface_variables.index('npp'), 
+                        #   nep=surface_variables.index('nep'))
+                          # headline=headline)
+        return pred,batch
+        
     def configure_optimizers(self):
         print('configure optimizers')
         opt = torch.optim.AdamW(self.backbone.parameters(), 
