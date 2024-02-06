@@ -29,7 +29,7 @@ def convert_to_joined_numpy(year,variation):
     # time = time[np.newaxis,:,:,:]
     # total_var_numpy_array = np.concatenate([Lmon.to_array().to_numpy(),Amon.to_array().to_numpy(),Emon.to_array().to_numpy(),lon,lat,time])
     xarray.merge([Lmon,Amon,Emon]).to_netcdf(f'{scratch_dir}/{year}_{variation}.nc')
-    # np.save(f'{scratch_dir}/{year}_{variation}',total_var_numpy_array)
+    #np.save(f'{scratch_dir}/{year}_{variation}',total_var_numpy_array)
     
     
     

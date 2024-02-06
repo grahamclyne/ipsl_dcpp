@@ -47,7 +47,7 @@ def train(cfg):
 
     checkpoint_callback = ModelCheckpoint(
         # dirpath=checkpoints_path, # <--- specify this on the trainer itself for version control
-        # filename="unet_classifier_" + wandb_logger.experiment.name + "_{epoch:02d}",
+        filename="24_month_{epoch:02d}",
         #filename=cfg.experiment.name + "_{epoch:02d}",
 
         # filename="unet_classifier_" + "_{epoch:02d}",

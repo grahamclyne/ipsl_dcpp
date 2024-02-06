@@ -6,7 +6,7 @@ from pathlib import Path
 from ipsl_dataset import surface_variables
 lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
 lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
-
+import numpy as np
 #pressure_levels = torch.tensor([  50,  100,  150,  200,  250,  300,  400,  500,  600,  700,  850,  925,1000]).float()
 #surface_coeffs = torch.tensor([0.1, 0.1, 1.0, 0.1])[None, :, None, None, None] # graphcast
 #surface_coeffs = torch.tensor([0.25, 0.25, 0.25, 0.25])[None, :, None, None, None] # pangu coeffs
@@ -30,7 +30,7 @@ class ForecastModule(pl.LightningModule):
         super().__init__()
         self.__dict__.update(locals())
         self.backbone = backbone # necessary to put it on device
-        
+        self.climatology = torch.from_numpy(np.load('climatology_from_train.npy'))
         
     def init_from_ckpt(self, path, ignore_keys=list()):
         sd = torch.load(path, map_location="cpu")["state_dict"]
@@ -71,9 +71,10 @@ class ForecastModule(pl.LightningModule):
        # mse_level_w = mse_level.mul(level_coeffs.to(device))
     
        # nvar = (surface_coeffs.sum().item() + 5)
+        mse_depth = (pred['next_state_depth'] - batch['next_state_depth']).pow(2)
         
         #loss = (mse_surface.sum(1).mean() + mse_level.sum(1).mean())/nvar
-        loss = (mse_surface.sum(1).mean() + mse_level.sum(1).mean())
+        loss = (mse_surface.sum(1).mean() + mse_level.sum(1).mean() + mse_depth.sum(1).mean())
 
         return mse_surface, mse_level, loss
         
@@ -119,34 +120,38 @@ class ForecastModule(pl.LightningModule):
 
     def predict_step(self,batch,batch_nb):
         pred = self.forward(batch)
-        print('here!')
+        t = batch['time']
+        t_1 = batch['next_time']
         pred, batch = self.dataset.denormalize(pred, batch)
+        pred_global_mean_surface = pred['next_state_surface'].mean((-2,-1))
+        batch_global_mean_surface = batch['next_state_surface'].mean((-2,-1))
+        current_state_surface = batch['state_surface'].mean((-2,-1))
+        month_indices = [int(x.split('-')[-1]) - 1 for x in t_1]
+        print(t_1)
+        pred_climatology_adjusted = pred['next_state_surface'] - np.broadcast_to(np.expand_dims(self.climatology[month_indices,:],axis=(-2,-1)),(len(month_indices),135,143,144))
+        batch_climatology_adjusted = batch['next_state_surface'] - np.broadcast_to(np.expand_dims(self.climatology[month_indices,:],axis=(-2,-1)),(len(month_indices),135,143,144))
 
-       # print(pred['next_state_level'].shape)
-       # print(pred['next_state_surface'].shape)
-       # print(batch['state_level'].shape)
-       # print(batch['state_surface'].shape)
-       # _, _, loss = self.loss(pred, batch)
-       # self.mylog(loss=loss)
-        # to compare with batch['next_state_level']...
-       # pred, batch = self.dataset.denormalize(pred, batch)
-       # mse_surface, mse_level, _ = self.loss(pred, batch)
+        lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
+        lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
 
-       # mse_level = mse_level.cpu().mean((-2, -1)).sqrt().mean(0)
-       # mse_surface = mse_surface.cpu().mean((-3, -2, -1)).sqrt().mean(0)
 
-        #headline = (mse_level[0, 7]/100 + mse_level[3, 10] + mse_level[4, 9] 
-        #        + (mse_level[1, 9] + mse_level[2, 9])/3/2**.5
-        #        + mse_surface[2] + mse_surface[0] + mse_surface[3]/100)/7
+        def acc(x, y, coeffs, dims=(-2, -1)):
+           norm = (x*x).mul(coeffs).mean(dims)**.5
+           mean_acc = (x*y).mul(coeffs).mean(dims) / norm / (y*y).mul(coeffs).mean(dims)**.5
+           return mean_acc
+        mean_acc = acc(pred_climatology_adjusted ,batch_climatology_adjusted,lat_coeffs_equi)
+        #lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
+        #lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
 
-    
-        #self.mylog(batch_size=pred['next_state_level'].shape[0]*1.0)
-                        #  gpp=surface_variables.index('gpp'),  
-                        #   npp=surface_variables.index('npp'), 
-                        #   nep=surface_variables.index('nep'))
-                          # headline=headline)
-        return pred,batch
         
+        #def acc(x, y, coeffs, dims=(-2, -1)):
+        #    norm = (x*x).mul(coeffs).mean(dims)**.5
+        #    mean_acc = (x*y).mul(coeffs).mean(dims) / norm / (y*y).mul(coeffs).mean(dims)**.5
+        #    return mean_acc
+        #mean_acc = acc(pred['next_state_surface'],batch['next_state_surface'])
+        #return mean_acc
+        #return pred['next_state_surface'],batch['next_state_surface'],t,t_1
+        return mean_acc,pred_global_mean_surface,batch_global_mean_surface,current_state_surface
     def configure_optimizers(self):
         print('configure optimizers')
         opt = torch.optim.AdamW(self.backbone.parameters(), 

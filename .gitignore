@@ -166,3 +166,4 @@ wandb/
 outputs/
 lightning_logs/
 ipsl_dcpp_emulation/
+*.png

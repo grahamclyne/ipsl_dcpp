@@ -378,7 +378,6 @@ class EarthSpecificBlock(nn.Module):
         Pl, Lat, Lon = self.input_resolution
         B, L, C = x.shape
 
-
         assert L == Pl * Lat * Lon, "input feature has wrong size"
 
         shortcut = x
