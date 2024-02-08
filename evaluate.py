@@ -28,20 +28,34 @@ def main(cfg: DictConfig):
     # 2 year
     checkpoint_path = f'{work}/ipsl_dcpp/ipsl_dcpp_emulation/0qo4adab/checkpoints/24_month_epoch=04.ckpt'
 
-    checkpoint = torch.load(checkpoint_path,map_location=torch.device('cpu'))
+    no_soil_checkpoint_5_year = f'{work}/ipsl_dcpp/ipsl_dcpp_emulation/kwsn8y3n/checkpoints/24_month_epoch=07.ckpt'
+    with_soil_checkpoint_5_year = f'{work}/ipsl_dcpp/ipsl_dcpp_emulation/jvlh5yoa/checkpoints/24_month_epoch=07.ckpt'
+    
+    no_soil_checkpoint = torch.load(no_soil_checkpoint_5_year,map_location=torch.device('cpu'))
+    soil_checkpoint = torch.load(with_soil_checkpoint_5_year,map_location=torch.device('cpu'))
+    print(cfg)
+    print(cfg.experiment)
     test = IPSL_DCPP('test',cfg.experiment.lead_time_months)
     test_dataloader = torch.utils.data.DataLoader(test,batch_size=4,shuffle=False,num_workers=1)
-    model = hydra.utils.instantiate(
+    soil_model = hydra.utils.instantiate(
         cfg.experiment.module,
-        backbone=hydra.utils.instantiate(cfg.experiment.backbone),
+        backbone=hydra.utils.instantiate(cfg.experiment.backbone,soil=True),
         dataset=test_dataloader.dataset
     )
-
-    model.load_state_dict(checkpoint['state_dict'])
-
+    no_soil_model = hydra.utils.instantiate(
+        cfg.experiment.module,
+        backbone=hydra.utils.instantiate(cfg.experiment.backbone,soil=False),
+        dataset=test_dataloader.dataset
+    )
+    soil_model.load_state_dict(soil_checkpoint['state_dict'])
+    no_soil_model.load_state_dict(no_soil_checkpoint['state_dict'])
     trainer = pl.Trainer()
-    output = trainer.predict(model, test_dataloader)
-    np.save('test_output.npy',output)
+    soil_output = trainer.predict(soil_model, test_dataloader)
+    no_soil_output = trainer.predict(soil_model, test_dataloader)
+
+    np.save('soil_test_output.npy',soil_output)
+    np.save('no_soil_test_output.npy',no_soil_output)
+
     #var_name = 'tas'
     #ps,bs = get_time_series(output,surface_variables.index(var_name))
     #plt.plot(ps,label='pred')

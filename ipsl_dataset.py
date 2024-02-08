@@ -407,9 +407,9 @@ class IPSL_DCPP(torch.utils.data.Dataset):
     
     def denormalize(self, pred, batch):
         device = pred['next_state_level'].device
-        denorm_level = lambda x: x*torch.from_numpy(self.plev_stds).to(device) + torch.from_numpy(self.plev_means).to(device)
-        denorm_surface = lambda x: x*torch.from_numpy(self.surface_stds).to(device) + torch.from_numpy(self.surface_means).to(device)
-        denorm_depth = lambda x: x*torch.from_numpy(self.depth_stds).to(device) + torch.from_numpy(self.depth_means).to(device)
+        denorm_level = lambda x: x.to(device)*torch.from_numpy(self.plev_stds).to(device) + torch.from_numpy(self.plev_means).to(device)
+        denorm_surface = lambda x: x.to(device)*torch.from_numpy(self.surface_stds).to(device) + torch.from_numpy(self.surface_means).to(device)
+        denorm_depth = lambda x: x.to(device)*torch.from_numpy(self.depth_stds).to(device) + torch.from_numpy(self.depth_means).to(device)
 
         pred = dict(next_state_level=denorm_level(pred['next_state_level']),
                     next_state_surface=denorm_surface(pred['next_state_surface']),

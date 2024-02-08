@@ -69,13 +69,14 @@ class ForecastModule(pl.LightningModule):
        #     mse_level = mse_level[..., 4:-4, 8:-8]
         mse_level = mse_level.mul(lat_coeffs.to(device))
        # mse_level_w = mse_level.mul(level_coeffs.to(device))
-    
+        if(self.backbone.soil):
        # nvar = (surface_coeffs.sum().item() + 5)
-        mse_depth = (pred['next_state_depth'] - batch['next_state_depth']).pow(2)
+            mse_depth = (pred['next_state_depth'] - batch['next_state_depth']).pow(2)
         
         #loss = (mse_surface.sum(1).mean() + mse_level.sum(1).mean())/nvar
-        loss = (mse_surface.sum(1).mean() + mse_level.sum(1).mean() + mse_depth.sum(1).mean())
-
+            loss = (mse_surface.sum(1).mean() + mse_level.sum(1).mean() + mse_depth.sum(1).mean())
+        else:
+            loss = (mse_surface.sum(1).mean() + mse_level.sum(1).mean())
         return mse_surface, mse_level, loss
         
 

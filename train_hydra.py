@@ -66,7 +66,7 @@ def train(cfg):
         precision="16-mixed",
         profiler='simple' if cfg.debug else None,
         devices=cfg.experiment.num_gpus,
-        strategy='ddp' if cfg.experiment.num_gpus > 1 else 'auto',
+        strategy='ddp_find_unused_parameters_true' if ((cfg.experiment.num_gpus > 1) and not cfg.experiment.backbone.soil) else 'ddp' if cfg.experiment.num_gpus > 1 else 'auto',
         accelerator="gpu",
         #limit_train_batches=0.01 if cfg.debug else 1
         #limit_val_batches=0.01 if cfg.debug else 1
@@ -123,7 +123,7 @@ def main(cfg: DictConfig):
                                  slurm_job_name=cfg.experiment.name,
                                  #slurm_hint='nomultithread',
                                  
-                                 slurm_constraint=cfg.experiment.constraint,
+                                 slurm_constraint='v100-32g',
                                 #slurm_use_srun=True,
                                 # slurm_'nomultithread'
                              )
