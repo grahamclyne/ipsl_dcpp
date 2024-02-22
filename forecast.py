@@ -55,7 +55,7 @@ class ForecastModule(pl.LightningModule):
             
     def loss(self, pred, batch, lat_coeffs=lat_coeffs_equi):
         device = batch['next_state_surface'].device
-        
+       # print(pred['next_state_surface'].shape,batch['next_state_surface'].shape)
         mse_surface = (pred['next_state_surface'] - batch['next_state_surface']).abs().pow(self.pow)
         
         
@@ -72,11 +72,12 @@ class ForecastModule(pl.LightningModule):
         if(self.backbone.soil):
        # nvar = (surface_coeffs.sum().item() + 5)
             mse_depth = (pred['next_state_depth'] - batch['next_state_depth']).pow(2)
-        
+            mse_depth = mse_depth.mul(lat_coeffs.to(device))
         #loss = (mse_surface.sum(1).mean() + mse_level.sum(1).mean())/nvar
             loss = (mse_surface.sum(1).mean() + mse_level.sum(1).mean() + mse_depth.sum(1).mean())
         else:
             loss = (mse_surface.sum(1).mean() + mse_level.sum(1).mean())
+
         return mse_surface, mse_level, loss
         
 
@@ -89,6 +90,9 @@ class ForecastModule(pl.LightningModule):
                         next_state_surface=batch['state_surface']+pred['next_state_surface'])
         _, _, loss = self.loss(pred, batch)
         self.mylog(loss=loss)
+        #for name, param in self.backbone.named_parameters():
+        #    if param.grad is None:
+        #        print(name)
         return loss
         
         
@@ -128,9 +132,8 @@ class ForecastModule(pl.LightningModule):
         batch_global_mean_surface = batch['next_state_surface'].mean((-2,-1))
         current_state_surface = batch['state_surface'].mean((-2,-1))
         month_indices = [int(x.split('-')[-1]) - 1 for x in t_1]
-        print(t_1)
-        pred_climatology_adjusted = pred['next_state_surface'] - np.broadcast_to(np.expand_dims(self.climatology[month_indices,:],axis=(-2,-1)),(len(month_indices),135,143,144))
-        batch_climatology_adjusted = batch['next_state_surface'] - np.broadcast_to(np.expand_dims(self.climatology[month_indices,:],axis=(-2,-1)),(len(month_indices),135,143,144))
+        pred_climatology_adjusted = pred['next_state_surface'] - torch.broadcast_to(self.climatology[month_indices,:],(143,144,1,135)).permute(2,3,0,1)
+        batch_climatology_adjusted = batch['next_state_surface'] - torch.broadcast_to(self.climatology[month_indices,:],(143,144,1,135)).permute(2,3,0,1)
 
         lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
         lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
@@ -152,7 +155,7 @@ class ForecastModule(pl.LightningModule):
         #mean_acc = acc(pred['next_state_surface'],batch['next_state_surface'])
         #return mean_acc
         #return pred['next_state_surface'],batch['next_state_surface'],t,t_1
-        return mean_acc,pred_global_mean_surface,batch_global_mean_surface,current_state_surface
+        return mean_acc,pred_global_mean_surface,batch_global_mean_surface,pred,batch
     def configure_optimizers(self):
         print('configure optimizers')
         opt = torch.optim.AdamW(self.backbone.parameters(), 

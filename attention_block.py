@@ -373,8 +373,81 @@ class EarthSpecificBlock(nn.Module):
             attn_mask = None
 
         self.register_buffer("attn_mask", attn_mask)
+    def forward(self, x: torch.Tensor, c: torch.Tensor = None, dt=1):
+        Pl, Lat, Lon = self.input_resolution
+        B, L, C = x.shape
+        assert L == Pl * Lat * Lon, "input feature has wrong size"
 
-    def forward(self, x: torch.Tensor, dt=1):
+        shortcut = x
+        x = self.norm1(x)
+
+        # first modulation
+        if c is not None:
+            shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = c.chunk(6, dim=1)
+            x = x * (1 + scale_msa[:, None, :]) + shift_msa[:, None, :]
+        
+        x = x.view(B, Pl, Lat, Lon, C)
+
+        # start pad
+        x = self.pad(x.permute(0, 4, 1, 2, 3)).permute(0, 2, 3, 4, 1)
+
+        _, Pl_pad, Lat_pad, Lon_pad, _ = x.shape
+
+        shift_pl, shift_lat, shift_lon = self.shift_size
+        if self.roll:
+            shifted_x = torch.roll(x, shifts=(-shift_pl, -shift_lat, -shift_lat), dims=(1, 2, 3))
+            x_windows = window_partition(shifted_x, self.window_size)
+            # B*num_lon, num_pl*num_lat, win_pl, win_lat, win_lon, C
+        else:
+            shifted_x = x
+            x_windows = window_partition(shifted_x, self.window_size)
+            # B*num_lon, num_pl*num_lat, win_pl, win_lat, win_lon, C
+
+        win_pl, win_lat, win_lon = self.window_size
+        x_windows = x_windows.view(x_windows.shape[0], x_windows.shape[1], win_pl * win_lat * win_lon, C)
+        # B*num_lon, num_pl*num_lat, win_pl*win_lat*win_lon, C
+
+        attn_windows = self.attn(x_windows, mask=self.attn_mask)  # B*num_lon, num_pl*num_lat, win_pl*win_lat*win_lon, C
+
+        attn_windows = attn_windows.view(attn_windows.shape[0], attn_windows.shape[1], win_pl, win_lat, win_lon, C)
+
+        if self.roll:
+            shifted_x = window_reverse(attn_windows, self.window_size, Pl_pad, Lat_pad, Lon_pad)
+            # B * Pl * Lat * Lon * C
+            x = torch.roll(shifted_x, shifts=(shift_pl, shift_lat, shift_lon), dims=(1, 2, 3))
+        else:
+            shifted_x = window_reverse(attn_windows, self.window_size, Pl_pad, Lat_pad, Lon_pad)
+            x = shifted_x
+
+        # crop, end pad
+        x = crop3d(x.permute(0, 4, 1, 2, 3), self.input_resolution).permute(0, 2, 3, 4, 1)
+
+        x = x.reshape(B, Pl * Lat * Lon, C)
+
+        # try axial attention here ?
+        if hasattr(self, 'axis_attn'):
+            x2 = x.reshape(B, Pl, Lat*Lon, C).movedim(2, 1).flatten(0, 1) # B*Lat*Lon, Pl, C
+            x2 = self.axis_pos(x2)
+            x2 = self.axis_attn(x2)
+            x2 = x2.reshape(B, Lat*Lon, Pl, C).movedim(1, 2).flatten(1, 2) # B, Pl*Lat*Lon, C
+
+
+        if isinstance(dt, torch.Tensor):
+           dt = dt[:, :, None]
+        if c is None:
+            x = shortcut + dt*self.drop_path(x)
+            if hasattr(self, 'axis_attn'):
+                x = x + dt*self.drop_path(x2)
+            x = x + dt*self.drop_path(self.mlp(self.norm2(x)))
+        else:
+            # already computed, just here for reference
+            #shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = c.chunk(6, dim=1)
+            x = shortcut + gate_msa[:, None, :] * self.drop_path(x)
+            mlp_input = self.norm2(x) * (1 + scale_mlp[:, None, :]) + shift_mlp[:, None, :]
+            x = x + self.drop_path(gate_mlp[:, None, :] * self.mlp(mlp_input))
+        return x
+
+    """def forward(self, x: torch.Tensor, dt=1):
         Pl, Lat, Lon = self.input_resolution
         B, L, C = x.shape
 
@@ -425,7 +498,7 @@ class EarthSpecificBlock(nn.Module):
 
         x = x + dt*self.drop_path(self.mlp(self.norm2(x)))
 
-        return x
+        return x"""
 
 
 class BasicLayer(nn.Module):
@@ -462,8 +535,28 @@ class BasicLayer(nn.Module):
             for i in range(depth)
         ])
 
-    def forward(self, x, dt=1):
+    def forward(self, x, *args, **kwargs):
         for blk in self.blocks:
-            x = blk(x, dt=dt)
+            x = blk(x, *args, **kwargs)
         return x
 
+
+    # for this we need a new BasicLayer
+class CondBasicLayer(BasicLayer):
+    def __init__(self, *args, dim=192, cond_dim=32, **kwargs):
+        super().__init__(*args, dim=dim, **kwargs)
+        self.adaLN_modulation = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(cond_dim, dim * 6, bias=True)
+        )
+        nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
+        nn.init.constant_(self.adaLN_modulation[-1].bias, 0)
+        # init the modulation
+
+    def forward(self, x, cond_emb=None):
+       # print(x.shape,cond_emb.shape)
+        c = self.adaLN_modulation(cond_emb)
+       # print(c.shape)
+       # print(c)
+        return super().forward(x, c)
+    

@@ -39,7 +39,7 @@ def main():
         logger=wandb_logger,
         precision="16-mixed",
         devices=1,
-        #strategy='ddp_find_unused_parameters_true',
+        strategy='ddp_find_unused_parameters_true',
         accelerator="gpu"
     )
     trainer.fit(

@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - environment: jean_zay
-  - experiment: a100_five_year_depth
+  - experiment: one_month_full_variable_a100
 #to override, use: python run.py environment=cleps
 
 project_name: ipsl_dcpp_emulation

@@ -167,3 +167,5 @@ outputs/
 lightning_logs/
 ipsl_dcpp_emulation/
 *.png
+CMIP6_MIP_tables.xlsx
+images/

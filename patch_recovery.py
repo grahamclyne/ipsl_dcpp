@@ -1,5 +1,49 @@
 from torch import nn 
 import torch
+from torch.nn import GELU as GeLU
+
+
+
+
+class Interpolate(nn.Module):
+    """Interpolation module."""
+
+    def __init__(self, scale_factor, mode, align_corners=False):
+        """Init.
+
+        Args:
+            scale_factor (float): scaling
+            mode (str): interpolation mode
+        """
+        super(Interpolate, self).__init__()
+
+        self.interp = nn.functional.interpolate
+        self.scale_factor = scale_factor
+        self.mode = mode
+        self.align_corners = align_corners
+
+    def forward(self, x):
+        """Forward pass.
+
+        Args:
+            x (tensor): input
+
+        Returns:
+            tensor: interpolated data
+        """
+
+        x = self.interp(
+            x,
+            scale_factor=self.scale_factor,
+            mode=self.mode,
+            align_corners=self.align_corners,
+        )
+
+        return x
+
+
+
+
 
 class PatchRecovery2D(nn.Module):
     """
@@ -67,3 +111,43 @@ class PatchRecovery3D(nn.Module):
 
         return output[:, :, padding_front: Pl - padding_back,
                padding_top: Lat - padding_bottom, padding_left: Lon - padding_right]
+    
+    
+class PatchRecovery3(nn.Module):
+    def __init__(self, 
+        input_dim=None,
+        dim=192,
+        downfactor=4,
+        output_dim=137):
+# input dim equals input_dim*z since we will be flattening stuff ?
+        super().__init__()
+        self.downfactor = downfactor
+        if input_dim is None:
+            input_dim = 8*dim
+        self.head1 = nn.Sequential(
+            nn.Conv2d(input_dim, 8*dim, kernel_size=1, stride=1, padding=0),
+            Interpolate(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(8*dim, 4*dim, kernel_size=3, stride=1, padding=1),
+            GeLU(),
+            nn.Conv2d(4*dim, 4*dim, kernel_size=1, stride=1, padding=0))
+        self.head2 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=4*dim, eps=1e-6, affine=True),
+            Interpolate(scale_factor=2, mode="bilinear", align_corners=True),
+            nn.Conv2d(4*dim, 4*dim, kernel_size=3, stride=1, padding=1),
+            GeLU())
+        self.proj = nn.Conv2d(4*dim, output_dim, kernel_size=(4,5), stride=1, padding=(1,2))
+
+    def forward(self, x):
+        #print('before',x.shape)
+        #x = x.permute(0, 2, 1)
+        #x = x.reshape((x.shape[0], x.shape[1]*Z, H, W))
+        x = x.flatten(1, 2)
+        x = self.head1(x)
+        if self.downfactor == 4:
+            x = self.head2(x)
+        x = self.proj(x) 
+        output_surface = x[:, :135]
+        output = x[:, 135:287].reshape((x.shape[0], 8, 19, *x.shape[-2:]))
+        output_depth = x[:,287:].reshape((x.shape[0],3,11,*x.shape[-2:]))
+        
+        return output, output_surface,output_depth
