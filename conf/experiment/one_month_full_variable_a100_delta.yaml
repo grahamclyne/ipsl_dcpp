@@ -1,20 +1,20 @@
-name: 'one_month_full_variable_a100'
+name: 'one_month_full_variable_v100_delta'
 learning_rate: 0.0001
-num_cpus_per_task: 8
+num_cpus_per_task: 20
 lead_time_months: 1
 #see http://www.idris.fr/eng/jean-zay/gpu/jean-zay-gpu-exec_partition_slurm-eng.html for gpu to cpu ratio for different partitions
 num_gpus: 4
-gpu_type: a100
-train_batch_size: 4
-val_batch_size: 4
+gpu_type: v100
+train_batch_size: 1
+val_batch_size: 1
 max_epochs: 100
 #qos: "qos_gpu-dev"
 qos: "qos_gpu-t4"
 #max_steps: 100000
-slurm_time: "06:00:00"
+slurm_time: "07:00:00"
 seed: 0
 patch_size: (2,2,2)
-depth_multiplier: 1
+depth_multiplier: 2
 train_dataset:
   _target_: ipsl_dataset.IPSL_DCPP
   domain: train
@@ -26,6 +26,7 @@ val_dataset:
   lead_time_months: 1
 module:
   _target_: forecast.ForecastModule
+  delta: False
 
 backbone:
   _target_: pangu.PanguWeather

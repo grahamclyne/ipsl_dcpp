@@ -64,10 +64,10 @@ class PanguWeather(nn.Module):
                  emb_dim=192, 
                  cond_dim=256, # dim of the conditioning
                  num_heads=(6, 12, 12, 6),
-                 patch_size=(2, 2,2),
+                 patch_size=(2,2,2),
                  two_poles=False,
                  window_size=(2, 6, 12), 
-                 depth_multiplier=1,
+                 depth_multiplier=2,
                  position_embs_dim=0,
                  surface_ch=len(surface_variables),
                  level_ch=len(plev_variables),
@@ -175,11 +175,12 @@ class PanguWeather(nn.Module):
         depth = batch['state_depth']
         constants = batch['state_constant'].squeeze(-3)
         dt = np.vectorize(datetime.datetime.strptime)(batch['time'],'%Y-%m')
-        time_step_conversion = np.vectorize(lambda x: (((x.year - 1961) * 12) + x.month) / ((2016 - 1961) * 12))
+        time_step_conversion = np.vectorize(lambda x: ((x.year - 1961) * 12) + x.month)
         timestep = torch.Tensor(time_step_conversion(dt)).to(surface.device)
         
         
         c = self.time_embedding(timestep)
+       # print(c.shape)
         #what does none here mean? 
         #pos_embs = self.positional_embeddings[None].expand((surface.shape[0], *self.positional_embeddings.shape))
         
@@ -232,7 +233,7 @@ class PanguWeather(nn.Module):
         output = x
         #what is zdim here? output channels
         output = output.transpose(1, 2).reshape(output.shape[0], -1, self.zdim, *self.layer1_shape)
-        #print(output.shape)
+       # print('output',output.shape)
         if not self.conv_head:
             output_surface = output[:, :, 0, :, :]
             if(self.soil):

@@ -1,11 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=rollout     # job name
 #SBATCH --ntasks=1                   # number of MP tasks
-#SBATCH --ntasks-per-node=1          # this needs to correspond with # of GPUS
+#SBATCH --ntasks-per-node=1   
+#SBATCH --gres=gpu:1                 
 #SBATCH --cpus-per-task=8            # number of cores per tasks, see how many GPUs per node and take proportional amount of CPUs
 #SBATCH --hint=nomultithread         # we get physical cores not logical
-#SBATCH --time=00:05:00              # maximum execution time (HH:MM:SS)
-#SBATCH --account=mlr@cpu
+#SBATCH --time=00:10:00              # maximum execution time (HH:MM:SS)
+#SBATCH --account=mlr@v100
 
 cd ${WORK}/ipsl_dcpp
 

@@ -7,6 +7,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint,TQDMProgressBar
 import submitit
 import os
 from pathlib import Path
+from lightning.pytorch.callbacks import ModelSummary
 
 
 
@@ -26,7 +27,7 @@ def train(cfg):
         )
     else:
         wandb_logger = None
-    
+    patch_size = eval(cfg.experiment.patch_size)
     train = hydra.utils.instantiate(cfg.experiment.train_dataset)
     val = hydra.utils.instantiate(cfg.experiment.val_dataset)
     train_dataloader = torch.utils.data.DataLoader(
@@ -57,7 +58,7 @@ def train(cfg):
 
     trainer = pl.Trainer(
         max_epochs=cfg.experiment.max_epochs,
-        callbacks=[bar,checkpoint_callback],
+        callbacks=[bar,checkpoint_callback,ModelSummary(max_depth=-1)],
         default_root_dir=f"{cfg.environment.scratch_path}/checkpoint_{cfg.experiment.name}/",
         enable_checkpointing=True,
         log_every_n_steps=10, 
@@ -66,22 +67,29 @@ def train(cfg):
         precision="16-mixed",
         profiler='simple' if cfg.debug else None,
         devices=cfg.experiment.num_gpus,
-       # strategy='ddp_find_unused_parameters_true' if ((cfg.experiment.num_gpus > 1) and not cfg.experiment.backbone.soil) else 'ddp' if cfg.experiment.num_gpus > 1 else 'auto',
-        strategy='ddp_find_unused_parameters_true',
+        strategy='ddp_find_unused_parameters_true' if ((cfg.experiment.num_gpus > 1) and not cfg.experiment.backbone.soil) else 'ddp' if cfg.experiment.num_gpus > 1 else 'auto',
+       # strategy='ddp_find_unused_parameters_true',
         accelerator="gpu",
         #limit_train_batches=0.01 if cfg.debug else 1
-        #limit_val_batches=0.01 if cfg.debug else 1
+        #limit_val_batches=0.01 if cfg.debug else 1,
     )
 
-    model = hydra.utils.instantiate(cfg.experiment.module,backbone=hydra.utils.instantiate(cfg.experiment.backbone),dataset=val_dataloader.dataset)
+    model = hydra.utils.instantiate(
+        cfg.experiment.module,
+        backbone=hydra.utils.instantiate(
+            cfg.experiment.backbone,
+            patch_size=patch_size,
+            depth_multiplier=cfg.experiment.depth_multiplier
+        ),
+        dataset=val_dataloader.dataset
+    )
 
     trainer.fit(
         model=model,
         train_dataloaders=train_dataloader,
         val_dataloaders=val_dataloader
     )
-    
-    
+
 @hydra.main(version_base=None,config_path='./conf',config_name="config.yaml")
 def main(cfg: DictConfig):
     scratch_dir = os.environ['SCRATCH']

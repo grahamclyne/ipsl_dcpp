@@ -130,11 +130,11 @@ class PatchRecovery3(nn.Module):
             nn.Conv2d(8*dim, 4*dim, kernel_size=3, stride=1, padding=1),
             GeLU(),
             nn.Conv2d(4*dim, 4*dim, kernel_size=1, stride=1, padding=0))
-        self.head2 = nn.Sequential(
-            nn.GroupNorm(num_groups=32, num_channels=4*dim, eps=1e-6, affine=True),
-            Interpolate(scale_factor=2, mode="bilinear", align_corners=True),
-            nn.Conv2d(4*dim, 4*dim, kernel_size=3, stride=1, padding=1),
-            GeLU())
+       # self.head2 = nn.Sequential(
+       #     nn.GroupNorm(num_groups=32, num_channels=4*dim, eps=1e-6, affine=True),
+       #     Interpolate(scale_factor=2, mode="bilinear", align_corners=True),
+       #     nn.Conv2d(4*dim, 4*dim, kernel_size=3, stride=1, padding=1),
+       #     GeLU())
         self.proj = nn.Conv2d(4*dim, output_dim, kernel_size=(4,5), stride=1, padding=(1,2))
 
     def forward(self, x):
@@ -143,8 +143,8 @@ class PatchRecovery3(nn.Module):
         #x = x.reshape((x.shape[0], x.shape[1]*Z, H, W))
         x = x.flatten(1, 2)
         x = self.head1(x)
-        if self.downfactor == 4:
-            x = self.head2(x)
+        #if self.downfactor == 4:
+        #    x = self.head2(x)
         x = self.proj(x) 
         output_surface = x[:, :135]
         output = x[:, 135:287].reshape((x.shape[0], 8, 19, *x.shape[-2:]))

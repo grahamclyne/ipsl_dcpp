@@ -87,12 +87,18 @@ class ForecastModule(pl.LightningModule):
  #       print('RAM Used (GB):', psutil.virtual_memory()[3]/1000000000)
         if self.delta:
             pred = dict(next_state_level=batch['state_level']+pred['next_state_level'],
-                        next_state_surface=batch['state_surface']+pred['next_state_surface'])
+                        next_state_surface=batch['state_surface']+pred['next_state_surface'],
+                       next_state_depth=batch['state_depth']+pred['next_state_depth'])
         _, _, loss = self.loss(pred, batch)
         self.mylog(loss=loss)
-        #for name, param in self.backbone.named_parameters():
-        #    if param.grad is None:
-        #        print(name)
+    #    loss.backward()
+     #   for name, param in self.backbone.named_parameters():
+      #      if param.grad is None:
+       #         print(name)
+       # print('used')
+       # for name, param in self.backbone.named_parameters():
+       #     if param.grad is not None:
+       #         print(name)
         return loss
         
         
