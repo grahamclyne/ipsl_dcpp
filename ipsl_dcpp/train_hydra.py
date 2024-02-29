@@ -3,11 +3,10 @@ import hydra
 import torch
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch.callbacks import ModelCheckpoint,TQDMProgressBar
+from lightning.pytorch.callbacks import ModelCheckpoint,TQDMProgressBar,ModelSummary
 import submitit
 import os
 from pathlib import Path
-from lightning.pytorch.callbacks import ModelSummary
 
 
 
@@ -20,16 +19,25 @@ def train(cfg):
     if(cfg.environment.name == 'jean_zay'):
         os.environ['WANDB_MODE'] = 'offline'
         os.environ['WANDB_API_KEY'] = 'c1f678c655920120ec68e1dc542a9f5bab02dbfa'
-    if(not cfg.debug):
-        wandb_logger = WandbLogger(project=cfg.project_name,name=cfg.experiment.name)
-        wandb_logger.config = OmegaConf.to_container(
-            cfg, resolve=True, throw_on_missing=True
-        )
-    else:
-        wandb_logger = None
-    patch_size = eval(cfg.experiment.patch_size)
-    train = hydra.utils.instantiate(cfg.experiment.train_dataset)
-    val = hydra.utils.instantiate(cfg.experiment.val_dataset)
+        
+    wandb_logger = WandbLogger(
+        project=cfg.project_name,
+        name=cfg.experiment.name,
+        log_model=True
+    )
+    wandb_logger.config = OmegaConf.to_container(
+         cfg.experiment, resolve=True, throw_on_missing=True
+    )
+    train = hydra.utils.instantiate(
+        cfg.experiment.train_dataset,
+        surface_variables=cfg.experiment.surface_variables,
+        depth_variables=cfg.experiment.depth_variables
+    )
+    val = hydra.utils.instantiate(
+        cfg.experiment.val_dataset,
+        surface_variables=cfg.experiment.surface_variables,
+        depth_variables=cfg.experiment.depth_variables
+    )
     train_dataloader = torch.utils.data.DataLoader(
         train,
         batch_size=cfg.experiment.train_batch_size,
@@ -43,25 +51,19 @@ def train(cfg):
         num_workers=cfg.experiment.num_cpus_per_task
     )
 
-   # print(os.cpu_count())
-   # print(len(val))
 
     checkpoint_callback = ModelCheckpoint(
-        # dirpath=checkpoints_path, # <--- specify this on the trainer itself for version control
-        filename="24_month_{epoch:02d}",
-        #filename=cfg.experiment.name + "_{epoch:02d}",
-
-        # filename="unet_classifier_" + "_{epoch:02d}",
+        filename="checkpoint_{epoch:02d}",
         every_n_epochs=1,
-        #dirpath=f'{cfg.environment.scratch_path}/checkpoints/',
-        save_top_k=-1,)
+        save_top_k=-1,
+    )
 
     trainer = pl.Trainer(
         max_epochs=cfg.experiment.max_epochs,
         callbacks=[bar,checkpoint_callback,ModelSummary(max_depth=-1)],
         default_root_dir=f"{cfg.environment.scratch_path}/checkpoint_{cfg.experiment.name}/",
         enable_checkpointing=True,
-        log_every_n_steps=10, 
+        log_every_n_steps=10,
        # max_steps=cfg.experiment.max_steps if not cfg.debug else 10,
         logger=wandb_logger,
         precision="16-mixed",
@@ -78,8 +80,6 @@ def train(cfg):
         cfg.experiment.module,
         backbone=hydra.utils.instantiate(
             cfg.experiment.backbone,
-            patch_size=patch_size,
-            depth_multiplier=cfg.experiment.depth_multiplier
         ),
         dataset=val_dataloader.dataset
     )
@@ -94,14 +94,12 @@ def train(cfg):
 def main(cfg: DictConfig):
     scratch_dir = os.environ['SCRATCH']
     work_dir = os.environ['WORK']
-    #train(cfg)
-    # run on cluster
-    
-    #if(cfg.debug):
-    #    cfg.experiment.train_batch_size = 1
-    #    cfg.experiment.val_batch_size = 1
-    #    train(cfg)
-    #    return
+   
+    if(cfg.debug):
+        cfg.experiment.train_batch_size = 1
+        cfg.experiment.val_batch_size = 1
+        train(cfg)
+        return
     
     log_path = f'{work_dir}/submitit_logs'
     Path(log_path).mkdir(exist_ok=True)

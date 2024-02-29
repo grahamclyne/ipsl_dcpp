@@ -1,0 +1,8 @@
+[project]
+name = "ipsl_dcpp"
+version = "0.0.1"
+description = "ipsl emulator for ensemble generation"
+
+[build-system]
+build-backend = "flit_core.buildapi"
+requires = ["flit_core >=3.2,<4"]

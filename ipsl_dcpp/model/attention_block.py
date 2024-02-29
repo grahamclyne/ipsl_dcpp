@@ -373,19 +373,22 @@ class EarthSpecificBlock(nn.Module):
             attn_mask = None
 
         self.register_buffer("attn_mask", attn_mask)
-    def forward(self, x: torch.Tensor, c: torch.Tensor = None, dt=1):
+        
+    """def forward(self, x: torch.Tensor, c: torch.Tensor = None, dt=1):
         Pl, Lat, Lon = self.input_resolution
         B, L, C = x.shape
+        #print(x.shape)
+        #print(self.input_resolution)
         assert L == Pl * Lat * Lon, "input feature has wrong size"
 
         shortcut = x
         x = self.norm1(x)
-
+        #print('after norm1',x)
         # first modulation
         if c is not None:
             shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = c.chunk(6, dim=1)
             x = x * (1 + scale_msa[:, None, :]) + shift_msa[:, None, :]
-        
+       # print('after first modulation',x)
         x = x.view(B, Pl, Lat, Lon, C)
 
         # start pad
@@ -445,9 +448,9 @@ class EarthSpecificBlock(nn.Module):
             x = shortcut + gate_msa[:, None, :] * self.drop_path(x)
             mlp_input = self.norm2(x) * (1 + scale_mlp[:, None, :]) + shift_mlp[:, None, :]
             x = x + self.drop_path(gate_mlp[:, None, :] * self.mlp(mlp_input))
-        return x
+        return x"""
 
-    """def forward(self, x: torch.Tensor, dt=1):
+    def forward(self, x: torch.Tensor, dt=1):
         Pl, Lat, Lon = self.input_resolution
         B, L, C = x.shape
 
@@ -498,7 +501,7 @@ class EarthSpecificBlock(nn.Module):
 
         x = x + dt*self.drop_path(self.mlp(self.norm2(x)))
 
-        return x"""
+        return x
 
 
 class BasicLayer(nn.Module):
@@ -545,18 +548,21 @@ class BasicLayer(nn.Module):
 class CondBasicLayer(BasicLayer):
     def __init__(self, *args, dim=192, cond_dim=32, **kwargs):
         super().__init__(*args, dim=dim, **kwargs)
-        self.adaLN_modulation = nn.Sequential(
-            nn.SiLU(),
-            nn.Linear(cond_dim, dim * 6, bias=True)
-        )
-        nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
-        nn.init.constant_(self.adaLN_modulation[-1].bias, 0)
+      #  self.adaLN_modulation = nn.Sequential(
+      #      nn.SiLU(),
+      #      nn.Linear(cond_dim, dim * 6, bias=True)
+      #  )
+     #   nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
+     #   nn.init.constant_(self.adaLN_modulation[-1].bias, 0)
         # init the modulation
 
     def forward(self, x, cond_emb=None):
        # print(x.shape,cond_emb.shape)
-        c = self.adaLN_modulation(cond_emb)
-       # print(c.shape)
-       # print(c)
-        return super().forward(x, c)
+     #   c = self.adaLN_modulation(cond_emb)
+        
+     #   print(c.shape)
+     #   print(c)
+        c = None
+
+        return super().forward(x)
     
