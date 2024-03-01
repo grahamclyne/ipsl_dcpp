@@ -11,7 +11,7 @@ max_epochs: 100
 #qos: "qos_gpu-dev"
 qos: "qos_gpu-t4"
 #max_steps: 100000
-slurm_time: "00:05:00"
+slurm_time: "00:15:00"
 seed: 0
 #patch_size: (2,2,2)
 depth_multiplier: 1
@@ -55,7 +55,5 @@ backbone:
   use_skip: False
   delta: False
   
-surface_variables: [
-                   'gpp',
-                               ]
+surface_variables: ['gpp']
 depth_variables: ['mrsfl','mrsol','mrsll']
