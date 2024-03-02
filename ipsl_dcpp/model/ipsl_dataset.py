@@ -15,10 +15,10 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.depth_variables=depth_variables
         self.domain = domain
         #self.files = list(glob.glob(f'{scratch}/*_1.nc'))
-        self.files = list(glob.glob(f'{scratch}/*_[1,2].nc'))
+        self.files = list(glob.glob(f'{scratch}/*.nc'))
         self.files = dict(
                     all_=[str(x) for x in self.files],
-                    train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,1980))])],
+                    train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,2000))])],
                     val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2000,2012))])],
                     test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2012,2017))])])[domain]
         self.nfiles = len(self.files)

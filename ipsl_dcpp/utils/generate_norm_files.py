@@ -1,12 +1,18 @@
 import torch 
-from ipsl_dataset import IPSL_DCPP
+from ipsl_dcpp.model.ipsl_dataset import IPSL_DCPP
 from hydra import compose, initialize
 from omegaconf import OmegaConf
 import hydra
 import numpy as np
-with initialize(version_base=None, config_path="conf"):
+with initialize(version_base=None, config_path="../conf"):
     cfg = compose(config_name="config")
-train = IPSL_DCPP('train',generate_statistics=True,lead_time_months=1,surface_variables=cfg.experiment.surface_variables,depth_variables=cfg.experiment.depth_variables)
+train = IPSL_DCPP(
+    'train',
+    generate_statistics=True,
+    lead_time_months=1,
+    surface_variables=cfg.experiment.surface_variables,
+    depth_variables=cfg.experiment.depth_variables
+)
 train_dataloader = torch.utils.data.DataLoader(train,batch_size=1,shuffle=True,)
 
 
@@ -17,6 +23,8 @@ def z_normalize(data:np.ndarray,axes:tuple):
     # mean = np.broadcast_to(mean,data.shape)
     # std_dev = np.broadcast_to(std_dev,data.shape)
     # standardized_data = (data - mean) / std_dev
+    return mean,std_dev
+
 surface_means = []
 #plev_means = []
 depth_means =[]

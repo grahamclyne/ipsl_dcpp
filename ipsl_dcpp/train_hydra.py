@@ -19,6 +19,9 @@ def train(cfg):
     if(cfg.environment.name == 'jean_zay'):
         os.environ['WANDB_MODE'] = 'offline'
         os.environ['WANDB_API_KEY'] = 'c1f678c655920120ec68e1dc542a9f5bab02dbfa'
+        os.environ['WANDB_DIR'] = cfg.environment.scratch_path + '/wandb'
+        os.environ['WANDB_CACHE_DIR'] = cfg.environment.scratch_path + '/wandb'
+        os.environ['WANDB_DATA_DIR'] = cfg.environment.scratch_path + '/wandb'
         
     wandb_logger = WandbLogger(
         project=cfg.project_name,
@@ -53,15 +56,15 @@ def train(cfg):
 
 
     checkpoint_callback = ModelCheckpoint(
-        filename="checkpoint_{epoch:02d}",
+        filename="{epoch:02d}",
         every_n_epochs=1,
         save_top_k=-1,
+        dirpath=f"{cfg.environment.scratch_path}/checkpoint_{wandb_logger.experiment.id}/"
     )
 
     trainer = pl.Trainer(
         max_epochs=cfg.experiment.max_epochs,
         callbacks=[bar,checkpoint_callback,ModelSummary(max_depth=-1)],
-        default_root_dir=f"{cfg.environment.scratch_path}/checkpoint_{cfg.experiment.name}/",
         enable_checkpointing=True,
         log_every_n_steps=10,
        # max_steps=cfg.experiment.max_steps if not cfg.debug else 10,
