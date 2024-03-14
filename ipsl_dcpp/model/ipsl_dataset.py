@@ -10,7 +10,15 @@ work = os.environ['WORK'] + '/ipsl_dcpp/ipsl_dcpp'
 scratch = os.environ['SCRATCH']
 
 class IPSL_DCPP(torch.utils.data.Dataset):
-    def __init__(self,domain,lead_time_months,generate_statistics=False,surface_variables=None,depth_variables=None):
+    def __init__(self,
+                 domain,
+                 lead_time_months,
+                 generate_statistics=False,
+                 surface_variables=None,
+                 depth_variables=None,
+                 delta=False
+                ):
+        self.delta = delta
         self.surface_variables=surface_variables
         self.depth_variables=depth_variables
         self.domain = domain
@@ -25,13 +33,18 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.xr_options = dict(engine='netcdf4', cache=True)
         self.lead_time_months = lead_time_months
         self.land_mask = np.expand_dims(np.load(f'{work}/data/land_mask.npy'),axis=(0,1))
-
-        self.surface_means = np.expand_dims(np.load(f'{work}/data/single_var_surface_means.npy'),axis=(0,1))
-        self.surface_stds = np.expand_dims(np.load(f'{work}/data/single_var_surface_stds.npy'),axis=(0,1))
-        self.depth_means = np.expand_dims(np.load(f'{work}/data/depth_means.npy'),axis=(1,2,3))
-        self.depth_stds = np.expand_dims(np.load(f'{work}/data/depth_stds.npy'),axis=(1,2,3))
-      #  self.plev_means = np.expand_dims(np.load(f'{work}/ipsl_dcpp/data/plev_means.npy'),axis=(1,2,3))
-      #  self.plev_stds = np.expand_dims(np.load(f'{work}/ipsl_dcpp/data/plev_stds.npy'),axis=(1,2,3))
+       # self.surface_means = np.expand_dims(np.load(f'{work}/data/single_var_surface_means.npy'),axis=(0,1))
+       # self.surface_stds = np.expand_dims(np.load(f'{work}/data/single_var_surface_stds.npy'),axis=(0,1))
+        self.surface_means = np.expand_dims(np.load(f'{work}/data/climatology_surface_means.npy'),axis=0)
+        self.surface_stds = np.expand_dims(np.load(f'{work}/data/climatology_surface_stds.npy'),axis=0)
+        self.depth_means = np.expand_dims(np.load(f'{work}/data/climatology_depth_means.npy'),axis=(0,3))
+        self.depth_stds = np.expand_dims(np.load(f'{work}/data/climatology_depth_stds.npy'),axis=(0,3))
+        self.surface_delta_stds = np.expand_dims(np.load(f'{work}/data/surface_delta_std.npy'),axis=0)
+        self.depth_delta_stds = np.expand_dims(np.load(f'{work}/data/depth_delta_std.npy'),axis=(0,3))
+       # print(self.surface_means.shape)
+       # print(self.depth_means.shape) 
+       # self.plev_means = np.expand_dims(np.load(f'{work}/ipsl_dcpp/data/plev_means.npy'),axis=(1,2,3))
+       # self.plev_stds = np.expand_dims(np.load(f'{work}/ipsl_dcpp/data/plev_stds.npy'),axis=(1,2,3))
         self.generate_statistics=generate_statistics
         self.timestamps = []
         self.id2pt_path = f'{work}/data/{domain}_id2pt.pkl'
@@ -44,7 +57,10 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                     var_id = f.split('.')[0][-1]
                     file_stamps = [(fid, i, t,var_id) for (i, t) in enumerate(obs.time.to_numpy())]
                     #if doing autoregressive - don't include the last -leadtime- amount of each timeseries to avoid indexing overflow issues
-                    self.timestamps.extend(file_stamps[:-(self.lead_time_months+1)])
+                    if(self.lead_time_months == 0):
+                        self.timestamps.extend(file_stamps)
+                    else:
+                        self.timestamps.extend(file_stamps[:-(self.lead_time_months)])
                     #self.timestamps.extend(file_stamps)
             self.timestamps = sorted(self.timestamps, key=lambda x: x[-1]) # sort by timestamp
             self.id2pt = {i:(file_id, line_id) for (i, (file_id, line_id, var_id,s)) in enumerate(self.timestamps)}
@@ -67,20 +83,21 @@ class IPSL_DCPP(torch.utils.data.Dataset):
        # input_plev_variables = self.xarr_to_tensor(clim,plev_variables)
         input_depth_variables = self.xarr_to_tensor(clim,list(self.depth_variables))
         
-        
+
         target_surface_variables = self.xarr_to_tensor(clim_next, list(self.surface_variables))
-       # target_plev_variables = self.xarr_to_tensor(clim_next,plev_variables)
+        #target_plev_variables = self.xarr_to_tensor(clim_next,plev_variables)
         target_depth_variables = self.xarr_to_tensor(clim_next,list(self.depth_variables))
         time = clim.time.dt.strftime('%Y-%m').item()
         next_time = clim_next.time.dt.strftime('%Y-%m').item()
-
+        cur_month_index = int(time.split('-')[-1]) - 1
+        next_month_index = int(next_time.split('-')[-1]) - 1 
         if(not self.generate_statistics):
-            input_surface_variables = (input_surface_variables - self.surface_means) / self.surface_stds
+            input_surface_variables = (input_surface_variables - self.surface_means[:,cur_month_index]) / self.surface_stds[:,cur_month_index]
         #    input_plev_variables = (input_plev_variables - self.plev_means) / self.plev_stds
-            input_depth_variables = (input_depth_variables - self.depth_means) / self.depth_stds
-            target_surface_variables = (target_surface_variables - self.surface_means) / self.surface_stds
+            input_depth_variables = (input_depth_variables - self.depth_means[:,cur_month_index]) / self.depth_stds[:,cur_month_index]
+            target_surface_variables = (target_surface_variables - self.surface_means[:,next_month_index]) / self.surface_stds[:,next_month_index]
         #    target_plev_variables = (target_plev_variables - self.plev_means) / self.plev_stds
-            target_depth_variables = (target_depth_variables - self.depth_means) / self.depth_stds
+            target_depth_variables = (target_depth_variables - self.depth_means[:,next_month_index]) / self.depth_stds[:,next_month_index]
                      
 
             input_surface_variables = np.nan_to_num(input_surface_variables,0)
@@ -89,7 +106,9 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             target_surface_variables = np.nan_to_num(target_surface_variables,0)
           #  target_plev_variables = np.nan_to_num(target_plev_variables,0)
             target_depth_variables = np.nan_to_num(target_depth_variables,0)
-            
+        if(self.delta):
+            target_surface_variables = (target_surface_variables - input_surface_variables) / self.surface_delta_stds
+            target_depth_variables = (target_depth_variables - input_depth_variables) / self.depth_delta_stds
         out.update(dict(
                     state_surface=input_surface_variables,
            #         state_level=input_plev_variables,

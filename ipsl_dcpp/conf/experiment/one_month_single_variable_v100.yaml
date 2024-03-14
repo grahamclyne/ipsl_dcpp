@@ -1,4 +1,4 @@
-name: 'one_month_single_variable'
+name: 'with_soil_and_date_conditioning'
 learning_rate: 0.0001
 num_cpus_per_task: 20
 lead_time_months: 1
@@ -11,7 +11,7 @@ max_epochs: 100
 #qos: "qos_gpu-dev"
 qos: "qos_gpu-t4"
 #max_steps: 100000
-slurm_time: "04:00:00"
+slurm_time: "12:00:00"
 seed: 0
 depth_multiplier: 1
 train_dataset:
@@ -36,7 +36,7 @@ module:
   
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
-  soil: False
+  soil: True
   conv_head: False
   lon_resolution: 144
   lat_resolution: 143

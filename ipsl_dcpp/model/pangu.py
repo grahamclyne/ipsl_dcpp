@@ -92,7 +92,7 @@ class PanguWeather(nn.Module):
         
         #self.positional_embeddings = nn.Parameter(torch.zeros((position_embs_dim, lat_resolution, lon_resolution)))
         #torch.nn.init.trunc_normal_(self.positional_embeddings, 0.02)
-     #   self.time_embedding = TimestepEmbedder(cond_dim)
+        self.time_embedding = TimestepEmbedder(cond_dim)
         #nn.init.normal_(self.time_embedding.mlp[0].weight, std=0.02)
         #nn.init.normal_(self.time_embedding.mlp[2].weight, std=0.02)
         self.loss = torch.nn.MSELoss()
@@ -175,18 +175,18 @@ class PanguWeather(nn.Module):
             surface_mask (torch.Tensor): 2D 
             upper_air (torch.Tensor): 3D 
         """
-        surface = batch['state_surface'].squeeze(-3)
+        print(batch['state_surface'].shape)
+        print(batch['state_depth'].shape)
+        surface = batch['state_surface'].squeeze(-4)
        # upper_air = batch['state_level']
-        depth = batch['state_depth']
-        constants = batch['state_constant'].squeeze(-3)
-       # dt = np.vectorize(datetime.datetime.strptime)(batch['time'],'%Y-%m')
-       # time_step_conversion = np.vectorize(lambda x: x.month)
-       # timestep = torch.Tensor(time_step_conversion(dt)).to(surface.device)
+        depth = batch['state_depth'].squeeze(-5)
+        constants = batch['state_constant'].squeeze(-4)
+        dt = np.vectorize(datetime.datetime.strptime)(batch['time'],'%Y-%m')
+        time_step_conversion = np.vectorize(lambda x: x.month)
+        timestep = torch.Tensor(time_step_conversion(dt)).to(surface.device)
         
-        c = None
-        #c = self.time_embedding(timestep)
-    #    c = torch.zeros(c.shape).to(c.device)
-       # print(c.shape)
+       # c = None
+        c = self.time_embedding(timestep)
         #what does none here mean? 
         #pos_embs = self.positional_embeddings[None].expand((surface.shape[0], *self.positional_embeddings.shape))
         
@@ -198,10 +198,12 @@ class PanguWeather(nn.Module):
         
         
         #timestep = timestep.expand((1,1,surface.shape[-2],surface.shape[-1]))
-       # print(constants.shape)
-        surface = surface.unsqueeze(1)
+        #print(constants.shape)
+        #surface = surface.unsqueeze(3)
         #surface = torch.concat([surface,constants], dim=1)
         #surface = torch.concat([surface,constants],dim=1)
+        print(surface.shape)
+        print(depth.shape)
         surface = self.patchembed2d(surface)
        # upper_air = self.plev_patchembed3d(upper_air)
         if(self.soil):

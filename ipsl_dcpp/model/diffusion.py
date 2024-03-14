@@ -4,6 +4,7 @@ import torch
 import diffusers
 from pathlib import Path
 from diffusers.training_utils import compute_snr
+from ipsl_dcpp.model.pangu import TimestepEmbedder
 
 
 from .forecast import ForecastModule, pressure_levels, surface_coeffs, level_coeffs, lat_coeffs_equi
@@ -22,9 +23,7 @@ class DiffusionModule(ForecastModule):
         super().__init__(*args, **kwargs)
         self.snr_gamma = snr_gamma
         # cond_dim should be given as arg to the backbone
-        from backbones.dit import TimestepEmbedder
         self.month_embedder = TimestepEmbedder(cond_dim)
-        self.hour_embedder = TimestepEmbedder(cond_dim)
         self.timestep_embedder = TimestepEmbedder(cond_dim)
 
         self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_train_timesteps,
@@ -47,8 +46,7 @@ class DiffusionModule(ForecastModule):
         
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
         month_emb = self.month_embedder(month)
-        hour = torch.tensor([int(x[-5:-3]) for x in batch['time']]).to(device)
-        hour_emb = self.hour_embedder(hour)
+
 
         timestep_emb = self.timestep_embedder(timesteps)
 
@@ -89,22 +87,6 @@ class DiffusionModule(ForecastModule):
 
         _, _, per_sample_loss = self.loss(pred, batch)
 
-        # reweight loss with min snr gamma
-        if self.snr_gamma:
-            snr = compute_snr(self.noise_scheduler, timesteps)
-            base_weight = (
-                torch.stack([snr, self.snr_gamma * torch.ones_like(timesteps)], dim=1).min(dim=1)[0] / snr
-            )
-
-            if self.noise_scheduler.config.prediction_type == "v_prediction":
-                # Velocity objective needs to be floored to an SNR weight of one.
-                mse_loss_weights = base_weight + 1
-            else:
-                # Epsilon and sample both use the same loss weights.
-                mse_loss_weights = base_weight
-
-            loss = (per_sample_loss * mse_loss_weights)
-            
         loss = loss.mean()
         self.mylog(loss=loss)
         return loss

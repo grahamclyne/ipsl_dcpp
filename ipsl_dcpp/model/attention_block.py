@@ -374,7 +374,7 @@ class EarthSpecificBlock(nn.Module):
 
         self.register_buffer("attn_mask", attn_mask)
         
-    """def forward(self, x: torch.Tensor, c: torch.Tensor = None, dt=1):
+    def forward(self, x: torch.Tensor, c: torch.Tensor = None, dt=1):
         Pl, Lat, Lon = self.input_resolution
         B, L, C = x.shape
         #print(x.shape)
@@ -448,9 +448,9 @@ class EarthSpecificBlock(nn.Module):
             x = shortcut + gate_msa[:, None, :] * self.drop_path(x)
             mlp_input = self.norm2(x) * (1 + scale_mlp[:, None, :]) + shift_mlp[:, None, :]
             x = x + self.drop_path(gate_mlp[:, None, :] * self.mlp(mlp_input))
-        return x"""
+        return x
 
-    def forward(self, x: torch.Tensor, dt=1):
+    """def forward(self, x: torch.Tensor, dt=1):
         Pl, Lat, Lon = self.input_resolution
         B, L, C = x.shape
 
@@ -501,7 +501,7 @@ class EarthSpecificBlock(nn.Module):
 
         x = x + dt*self.drop_path(self.mlp(self.norm2(x)))
 
-        return x
+        return x"""
 
 
 class BasicLayer(nn.Module):
@@ -548,21 +548,15 @@ class BasicLayer(nn.Module):
 class CondBasicLayer(BasicLayer):
     def __init__(self, *args, dim=192, cond_dim=32, **kwargs):
         super().__init__(*args, dim=dim, **kwargs)
-      #  self.adaLN_modulation = nn.Sequential(
-      #      nn.SiLU(),
-      #      nn.Linear(cond_dim, dim * 6, bias=True)
-      #  )
-     #   nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
-     #   nn.init.constant_(self.adaLN_modulation[-1].bias, 0)
+        self.adaLN_modulation = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(cond_dim, dim * 6, bias=True)
+        )
+        nn.init.constant_(self.adaLN_modulation[-1].weight, 0)
+        nn.init.constant_(self.adaLN_modulation[-1].bias, 0)
         # init the modulation
 
     def forward(self, x, cond_emb=None):
-       # print(x.shape,cond_emb.shape)
-     #   c = self.adaLN_modulation(cond_emb)
-        
-     #   print(c.shape)
-     #   print(c)
-        c = None
-
-        return super().forward(x)
+        c = self.adaLN_modulation(cond_emb)
+        return super().forward(x,c)
     
