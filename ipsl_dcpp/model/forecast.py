@@ -54,15 +54,14 @@ class ForecastModule(pl.LightningModule):
             
     def loss(self, pred, batch, lat_coeffs=lat_coeffs_equi):
         device = batch['next_state_surface'].device
+     #   print('before loss',pred['next_state_surface'])
        # print(pred['next_state_surface'].shape,batch['next_state_surface'].shape)
         mse_surface = (pred['next_state_surface'] - batch['next_state_surface']).abs().pow(2)
-        
-        
         #if mse_surface.shape[-2] == 128:
         #    mse_surface = mse_surface[..., 4:-4, 8:-8]
         mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
         #mse_surface_w = mse_surface.mul(surface_coeffs.to(device))
-    
+       # print(mse_surface)
      #   mse_level = (pred['next_state_level'] - batch['next_state_level']).pow(2)
        # if mse_level.shape[-2] == 128:
        #     mse_level = mse_level[..., 4:-4, 8:-8]
@@ -86,11 +85,13 @@ class ForecastModule(pl.LightningModule):
         pred = self.forward(batch)
  #       import psutil 
  #       print('RAM Used (GB):', psutil.virtual_memory()[3]/1000000000)
-        if self.delta:
-            pred = dict(#next_state_level=batch['state_level']+pred['next_state_level'],
-                        next_state_surface=batch['state_surface']+pred['next_state_surface'],
-                       next_state_depth=batch['state_depth']+pred['next_state_depth'])
+       # if self.delta:
+       #     pred = dict(#next_state_level=batch['state_level']+pred['next_state_level'],
+       #                next_state_surface=batch['state_surface']+pred['next_state_surface'],
+       #                next_state_depth=batch['state_depth']+pred['next_state_depth'])
         _, _, loss = self.loss(pred, batch)
+       # print('pred',pred)
+       # print('loss',loss)
         self.mylog(loss=loss)
         
         #loss.backward()

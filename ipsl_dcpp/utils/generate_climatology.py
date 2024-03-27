@@ -16,14 +16,19 @@ store_dir = os.environ['STORE']
 #variation = 1
 #Amon =  xr.open_mfdataset(f'{store_dir}/s{year}-r{variation}i1p1f1/Amon/*.nc',compat='minimal')
 #get climatology over train period for a year period
-train = IPSL_DCPP('train',generate_statistics=True,lead_time_months=1)
-train_dataloader = torch.utils.data.DataLoader(IPSL_DCPP('train',0,surface_variables=cfg.experiment.surface_variables,depth_variables=cfg.experiment.depth_variables),batch_size=1,shuffle=False,num_workers=1)
+#train = IPSL_DCPP('train',generate_statistics=True,lead_time_months=1)
+train =  IPSL_DCPP('train',0,generate_statistics=True,
+              delta=False,
+              surface_variables=cfg.experiment.surface_variables,
+              depth_variables=cfg.experiment.depth_variables)
+train_dataloader = torch.utils.data.DataLoader(
+    train,batch_size=1,shuffle=False,num_workers=1)
 surface_means_out = []
 surface_stds_out = []
 depth_means_out = []
 depth_stds_out = []
 iter_batch = iter(train_dataloader)
-for count in range(10):
+for count in range(100):
     print(count)
     surface_means = []
     surface_stds = []
@@ -37,13 +42,13 @@ for count in range(10):
         depth_stds.append(batch['state_depth'].squeeze())
     
         
-
-    surface_means_out.append(np.stack(surface_means).reshape(-1,12,91,143,144).mean(axis=0))
-    surface_stds_out.append(np.stack(surface_stds).reshape(-1,12,91,143,144).mean(axis=0))
-    depth_means_out.append(np.stack(depth_means).reshape(-1,12,3,143,144).mean(axis=0))
-    depth_stds_out.append(np.stack(depth_stds).reshape(-1,12,3,143,144).mean(axis=0))
+    #need to take this for memory purposes
+    surface_means_out.append(np.nanmean(np.stack(surface_means).reshape(-1,12,91,143,144),axis=0))
+    surface_stds_out.append(np.nanstd(np.stack(surface_stds).reshape(-1,12,91,143,144),axis=0))
+    depth_means_out.append(np.nanmean(np.stack(depth_means).reshape(-1,12,3,11,143,144),axis=0))
+    depth_stds_out.append(np.nanstd(np.stack(depth_stds).reshape(-1,12,3,11,143,144),axis=0))
     
-np.save('climatology_surface_means.npy',np.stack(surface_means_out).mean(axis=0))
-np.save('climatology_surface_stds.npy',np.stack(surface_stds_out).mean(axis=0))
-np.save('climatology_depth_means.npy',np.stack(depth_means_out).mean(axis=0))
-np.save('climatology_depth_stds.npy',np.stack(depth_stds_out).mean(axis=0))
+np.save('climatology_surface_means.npy',np.nanmean(np.stack(surface_means_out),axis=0))
+np.save('climatology_surface_stds.npy',np.nanmean(np.stack(surface_stds_out),axis=0))
+np.save('climatology_depth_means.npy',np.nanmean(np.stack(depth_means_out),axis=0))
+np.save('climatology_depth_stds.npy',np.nanmean(np.stack(depth_stds_out),axis=0))

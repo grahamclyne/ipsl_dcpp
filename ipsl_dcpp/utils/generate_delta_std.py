@@ -16,17 +16,18 @@ store_dir = os.environ['STORE']
 #variation = 1
 #Amon =  xr.open_mfdataset(f'{store_dir}/s{year}-r{variation}i1p1f1/Amon/*.nc',compat='minimal')
 #get climatology over train period for a year period
-train = IPSL_DCPP('train',generate_statistics=True,lead_time_months=1)
+train = hydra.utils.instantiate(
+    cfg.experiment.train_dataset,
+    generate_statistics=False,
+    surface_variables=cfg.experiment.surface_variables,
+    depth_variables=cfg.experiment.depth_variables,
+    delta=True
+)
 train_dataloader = torch.utils.data.DataLoader(
-    IPSL_DCPP(
-        'train',
-        cfg.experiment.lead_time_months,
-        surface_variables=cfg.experiment.surface_variables,
-        depth_variables=cfg.experiment.depth_variables
-    ),
+    train,
     batch_size=1,
     shuffle=True,
-    num_workers=1
+    num_workers=1,
 )
 surface_means_out = []
 surface_stds_out = []

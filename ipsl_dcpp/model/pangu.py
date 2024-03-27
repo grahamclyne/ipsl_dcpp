@@ -100,7 +100,7 @@ class PanguWeather(nn.Module):
         self.patchembed2d = PatchEmbed2D(
             img_size=(lat_resolution, lon_resolution),
             patch_size=patch_size[1:],
-            in_chans=surface_ch,  # for extra constant later
+            in_chans=surface_ch,  
             embed_dim=emb_dim,
         )
    #     self.plev_patchembed3d = PatchEmbed3D(
@@ -175,18 +175,24 @@ class PanguWeather(nn.Module):
             surface_mask (torch.Tensor): 2D 
             upper_air (torch.Tensor): 3D 
         """
-        print(batch['state_surface'].shape)
-        print(batch['state_depth'].shape)
+        #print(batch['state_surface'].shape)
+        #print(batch['state_depth'].shape)
         surface = batch['state_surface'].squeeze(-4)
+       # print('surface',surface)
+       # print('surface non nan',torch.nonzero(torch.isnan(surface.view(-1))))
        # upper_air = batch['state_level']
         depth = batch['state_depth'].squeeze(-5)
         constants = batch['state_constant'].squeeze(-4)
+        #forcings = batch['forcings']
         dt = np.vectorize(datetime.datetime.strptime)(batch['time'],'%Y-%m')
         time_step_conversion = np.vectorize(lambda x: x.month)
         timestep = torch.Tensor(time_step_conversion(dt)).to(surface.device)
         
        # c = None
         c = self.time_embedding(timestep)
+       # c = None
+       # print('time_step_embedding shape',c.shape)
+       # print('forcings',forcings.shape)
         #what does none here mean? 
         #pos_embs = self.positional_embeddings[None].expand((surface.shape[0], *self.positional_embeddings.shape))
         
@@ -202,31 +208,39 @@ class PanguWeather(nn.Module):
         #surface = surface.unsqueeze(3)
         #surface = torch.concat([surface,constants], dim=1)
         #surface = torch.concat([surface,constants],dim=1)
-        print(surface.shape)
-        print(depth.shape)
+        #print(surface.shape)
+        #print(depth.shape)
         surface = self.patchembed2d(surface)
        # upper_air = self.plev_patchembed3d(upper_air)
+      #  print('surfae after embed',surface)
+       # print('null count',torch.isnan(surface.flatten()).sum() / len(surface.flatten()))
+
         if(self.soil):
             depth = self.depth_patchembed3d(depth)
+          #  print('depth ',depth)
+       #     print('null count',torch.isnan(depth.flatten()).sum() / len(depth.flatten()))
+
             #x = torch.concat([surface.unsqueeze(2), upper_air,depth], dim=2)
             x = torch.concat([surface.unsqueeze(2),depth], dim=2)
         else:
             x = surface.unsqueeze(2)
         B, C, Pl, Lat, Lon = x.shape
-       # print('after concat',x.shape)
-        
+       # x = torch.nan_to_num(x,0)
         x = x.reshape(B, C, -1).transpose(1, 2)
-     #   print('right before layer1',x.shape)
+     #   print('right before layer1',x[0][0])
+     #   print(x.shape)
+      #  print('null count',torch.isnan(x.flatten()).sum() / len(x.flatten()))
         x = self.layer1(x,c)
-
+     #   print('after later1',x[0][0])
+     #   print(x.shape)
         skip = x
         x = self.downsample(x)
-      #  print('downsampled',x.shape)
+     #   print('downsampled',x)
         #it = int'lead_time_hours', 24)//24)
         
         x = self.layer2(x,c)
         x = self.layer3(x,c)
-      #  print('after layer3',x.shape)
+      #  print('after layer3',x)
         #it3 = (batch['lead_time_hours'] == 72)[..., None].float().expand_as(x)
         
         #x72 = x
@@ -242,6 +256,7 @@ class PanguWeather(nn.Module):
         x = self.layer4(x,c)
         output = x
         #what is zdim here? output channels
+        
         output = output.transpose(1, 2).reshape(output.shape[0], -1, self.zdim, *self.layer1_shape)
         if not self.conv_head:
             output_surface = output[:, :, 0, :, :]
