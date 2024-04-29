@@ -21,7 +21,7 @@ train = hydra.utils.instantiate(
     generate_statistics=False,
     surface_variables=cfg.experiment.surface_variables,
     depth_variables=cfg.experiment.depth_variables,
-    delta=True
+    delta=False
 )
 train_dataloader = torch.utils.data.DataLoader(
     train,
@@ -42,8 +42,9 @@ for count in range(1000):
     batch = next(iter_batch)
     surface_delta = (batch['next_state_surface'] - batch['state_surface']).squeeze()
     depth_delta = (batch['next_state_depth'] - batch['state_depth']).squeeze()
+    print(np.nanmean(surface_delta))
     depth_deltas.append(depth_delta)
     surface_deltas.append(surface_delta)
     
-np.save('surface_delta_std',np.stack(surface_deltas).std(axis=0))
-np.save('depth_delta_std',np.stack(depth_deltas).std(axis=0))
+np.save('surface_delta_std',np.nanstd(np.stack(surface_deltas),axis=0))
+np.save('depth_delta_std',np.nanstd(np.stack(depth_deltas),axis=0))

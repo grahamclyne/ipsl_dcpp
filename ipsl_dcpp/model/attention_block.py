@@ -377,27 +377,16 @@ class EarthSpecificBlock(nn.Module):
     def forward(self, x: torch.Tensor, c: torch.Tensor = None, dt=1):
         Pl, Lat, Lon = self.input_resolution
         B, L, C = x.shape
-        #print(x.shape)
-        #print(self.input_resolution)
         assert L == Pl * Lat * Lon, "input feature has wrong size"
 
         shortcut = x
-     #   print(sum(torch.isnan(x).flatten()))
-
         x = self.norm1(x)
-    #    print('beginning of earthspecific',x[0][1000])
-    #    print(sum(torch.isnan(x).flatten()))
         x = torch.nan_to_num(x,0)
-        #print('after norm1',x)
         # first modulation
         if c is not None:
             shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = c.chunk(6, dim=1)
-          #  print('scale msa',scale_msa[:,None,:])
-          #  print('shift_msa',shift_msa[:,None,:])
             x = x * (1 + scale_msa[:, None, :]) + shift_msa[:, None, :]
-       # print('after first modulation',x)
         x = x.view(B, Pl, Lat, Lon, C)
-   #     print('after shift',x)
         # start pad
         x = self.pad(x.permute(0, 4, 1, 2, 3)).permute(0, 2, 3, 4, 1)
 
@@ -548,8 +537,6 @@ class BasicLayer(nn.Module):
 
     def forward(self, x, *args, **kwargs):
         for blk in self.blocks:
-      #      print(x.shape)
-      #      print('block',blk,x[0][0])
             x = blk(x, *args, **kwargs)
         return x
 
@@ -568,10 +555,5 @@ class CondBasicLayer(BasicLayer):
 
     def forward(self, x, cond_emb=None):
         c = self.adaLN_modulation(cond_emb)
-      #  print('conditioned',c[0][0],c.shape)
-      #  print(sum(torch.isnan(c).flatten()))
-      #  print(c.max())
-     #   print(c.min())
-        #assert sum(torch.isnan(c).flatten()) == 0
         return super().forward(x,c)
     

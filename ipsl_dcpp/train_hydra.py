@@ -42,17 +42,13 @@ def train(cfg,run_id):
     bar = TQDMProgressBar(refresh_rate=1)
     train = hydra.utils.instantiate(
         cfg.experiment.train_dataset,
-        generate_statistics=False,
         surface_variables=cfg.experiment.surface_variables,
         depth_variables=cfg.experiment.depth_variables,
-        delta=True
     )
     val = hydra.utils.instantiate(
         cfg.experiment.val_dataset,
-        generate_statistics=False,
         surface_variables=cfg.experiment.surface_variables,
         depth_variables=cfg.experiment.depth_variables,
-        delta=True
     )
     train_dataloader = torch.utils.data.DataLoader(
         train,
@@ -79,7 +75,7 @@ def train(cfg,run_id):
         max_epochs=cfg.experiment.max_epochs,
         callbacks=[bar,checkpoint_callback,ModelSummary(max_depth=-1)],
         enable_checkpointing=True,
-        log_every_n_steps=10,
+        log_every_n_steps=100,
        # max_steps=cfg.experiment.max_steps if not cfg.debug else 10,
         logger=wandb_logger,
       #  precision="16-mixed",

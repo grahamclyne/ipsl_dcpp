@@ -14,6 +14,7 @@ import datetime
 import subprocess
 import sys
 import scipy.stats as stats
+import xarray as xr
 
     #this refers to the amount of energy found per unit of time - assumes to be over all of time!!
     #average power of a sinusoid is amplitude^2 / 2
@@ -24,8 +25,8 @@ def get_power_spectral_density(data):
     #have to make this square, clip the last row of lats........
     data = data[:,:data.shape[0]]
     npix = data.shape[0]
-    print(npix)
-    print(data.shape)
+    #print(npix)
+    #print(data.shape)
     #take the fourier image - i.e. the spectral data in the frequency domain 
     fourier_image = np.fft.fftn(data)
     #take the amplitudes, and one side of the fourier image (it is symmetrical)
@@ -39,7 +40,7 @@ def get_power_spectral_density(data):
     #now return Discrete Fourier Transform sample frequencies from npix... what? 
     kfreq = np.fft.fftfreq(npix) * npix # this gives the freq in hertz, need to mulptiply by "frame rate" i.e. number of pixels? 
     kfreq2D = np.meshgrid(kfreq, kfreq)
-    print(kfreq2D[0].shape)
+  #  print(kfreq2D[0].shape)
     knrm = np.sqrt(kfreq2D[0]**2 + kfreq2D[1]**2)
 
     knrm = knrm.flatten()
@@ -47,9 +48,10 @@ def get_power_spectral_density(data):
 
     kbins = np.arange(0.5, npix//2+1, 1.)
     kvals = 0.5 * (kbins[1:] + kbins[:-1]) #center each bin?
-    print(fourier_amplitudes.shape)
-    print(knrm.shape)
-    print(kbins)
+  #  print(fourier_amplitudes.shape)
+  #  print(knrm.shape)
+  #  print(kbins)
+    print(knrm)
     Abins, _, _ = stats.binned_statistic(knrm, 
                                          fourier_amplitudes,
                                          statistic = "mean",
@@ -68,30 +70,29 @@ def inc_time(batch_time):
         month = batch_time.month + 1
     return f'{year}-{month}'
 
-def gif():
+def gif(predicted,actual,surface_var_name,test_dataset,length):
     #gif of rollout
     fig, (ax1,ax2) = plt.subplots(1, 2, figsize=(16, 6))
     camera = Camera(fig)
     ax1.set_title("predicted")
     ax2.set_title("IPSL_CM6A")
-    import xarray as xr
-    ds = xr.open_dataset(test.files[0])
+    ds = xr.open_dataset(test_dataset.files[0])
     shell = ds.isel(time=0)
 
     # Animate plot over time
-    for time_step in range(118):
+    for time_step in range(length):
         shell[surface_var_name].data = predicted[time_step]
         shell[surface_var_name].plot.pcolormesh(ax=ax1,add_colorbar=False)
-        shell[surface_var_name].data = climate_model[time_step]
+        shell[surface_var_name].data = actual[time_step]
         shell[surface_var_name].plot.pcolormesh(ax=ax2,add_colorbar=False)
         camera.snap()
     anim = camera.animate()
-    anim.save(f"{surface_var_name}_{checkpoint_folder}_rollout.gif")
+    anim.save(f"{surface_var_name}_rollout.gif")
 
     
     
 
-def rollout(length,dataloader,model):
+def rollout(length,dataloader,model,zeroes):
     iter_dl = iter(dataloader)
     surfaces = []
     plevs = []
@@ -99,25 +100,55 @@ def rollout(length,dataloader,model):
     model_surfaces = []
     for i in range(length):
         batch_actual = next(iter_dl)
+        print(batch_actual['time'])
+        #print(batch_actual['next_state_surface'].shape)
+        #print(np.expand_dims(dataloader.dataset.surface_delta_stds,0).shape)
+        if(dataloader.dataset.delta == True):
+            batch_actual['next_state_surface'] = (batch_actual['next_state_surface']*np.expand_dims(dataloader.dataset.surface_delta_stds,0)) + batch_actual['state_surface']
+
+        #_,batch_actual = dataloader.dataset.denormalize(None,batch_actual)
         if(i == 0):
             batch = batch_actual
-        model_surfaces.append(batch_actual['next_state_surface'])
+            surfaces.append(batch)
+            model_surfaces.append(batch)
+           # if(dataloader.dataset.delta == True):
+           #     batch_actual['next_state_surface'] = batch_actual['next_state_surface']*np.expand_dims(dataloader.dataset.surface_delta_stds,0) + batch_actual['state_surface']
+        else:
+            model_surfaces.append(batch_actual)
         #model_plevs.append(batch_actual['next_state_level'])
-        print(batch['time'])
+      #  batch['state_surface'] = batch['state_surface'].unsqueeze(0)
+       # batch['state_depth'] = batch['state_depth'].unsqueeze(0)
 
        # print(psutil.virtual_memory().available * 100 / psutil.virtual_memory().total)
+        if(zeroes == True):
+            batch['state_surface'] = torch.zeros(batch['state_surface'].shape)
+            batch['state_depth'] = torch.zeros(batch['state_depth'].shape)
+
         with torch.no_grad():
             output = model.forward(batch)
-
-       # output['next_state_surface'][:,var_index] = torch.where(land_mask == 1,output['next_state_surface'][:,var_index],0)
-        batch=dict(state_surface=output['next_state_surface'],
+        #land_mask = batch['state_constant']
+     #   output['next_state_surface'][:,89] = torch.where(land_mask.squeeze() == 1,output['next_state_surface'][:,89],0)
+        if(dataloader.dataset.delta == True):
+          #  print(np.expand_dims(dataloader.dataset.surface_delta_stds,0).shape)
+          #  print(output['next_state_surface'].unsqueeze(0).shape)
+          #  print(batch['state_surface'].shape)
+            batch=dict(
+                state_surface=output['next_state_surface'].unsqueeze(0)*np.expand_dims(dataloader.dataset.surface_delta_stds,0) + batch['state_surface'],
                    #state_level=output['next_state_level'] + batch['state_level'], 
-                   state_depth=output['next_state_depth'],
+                state_depth=output['next_state_depth'].unsqueeze(0)*np.expand_dims(dataloader.dataset.depth_delta_stds,0) + batch['state_depth'],
+                state_constant=batch['state_constant'],
+                next_state_surface= output['next_state_surface'].unsqueeze(0)*np.expand_dims(dataloader.dataset.surface_delta_stds,0) + batch['state_surface'],
+                next_state_depth=output['next_state_depth'].unsqueeze(0)*np.expand_dims(dataloader.dataset.depth_delta_stds,0) + batch['state_depth'],
+                time=[inc_time(batch['time'][0])])
+        else:
+            batch=dict(state_surface=output['next_state_surface'].unsqueeze(0),
+                   #state_level=output['next_state_level'] + batch['state_level'], 
+                   state_depth=output['next_state_depth'].unsqueeze(0),
                    state_constant=batch['state_constant'],
-                   next_state_surface=output['next_state_surface'],
-                   next_state_depth=output['next_state_depth'],
-                  time=[inc_time(batch['time'][0])])
-        surfaces.append(batch['state_surface'])
+                   next_state_surface= output['next_state_surface'].unsqueeze(0),
+                   next_state_depth=output['next_state_depth'].unsqueeze(0),
+                  time=[inc_time(batch['time'][0])])                                  
+        surfaces.append(batch)
     #    plevs.append(output['next_state_level'])
     return surfaces,model_surfaces
 
@@ -126,7 +157,7 @@ def main(cfg: DictConfig):
     scratch = os.environ['SCRATCH']
     work = os.environ['WORK']
     
-    run_id = cfg.run_id
+    run_id = ''
     out = subprocess.run(f'ls -tr {scratch}/checkpoint_{run_id}/ | tail -n 1',shell=True,capture_output=True,text=True)
     path = out.stdout.strip("\n")
     print(path)
@@ -213,6 +244,7 @@ def main(cfg: DictConfig):
     for index in range(0,len(output),3):
         pred = output[index][-2]
         batch = output[index][-1]
+        pred,batch = test.denormalize(pred,batch)
         print(pred['next_state_surface'].shape)
         predictions = pred['next_state_surface'].squeeze()[var_index]
         batch_data = batch['next_state_surface'].squeeze()[var_index]

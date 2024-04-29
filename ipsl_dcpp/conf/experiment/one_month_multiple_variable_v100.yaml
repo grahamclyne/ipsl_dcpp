@@ -1,4 +1,4 @@
-name: 'with_soil_and_date_conditioning_and_climatology_norms'
+name: 'ipsl_emulation'
 num_cpus_per_task: 20
 lead_time_months: 1
 #see http://www.idris.fr/eng/jean-zay/gpu/jean-zay-gpu-exec_partition_slurm-eng.html for gpu to cpu ratio for different partitions
@@ -10,26 +10,30 @@ max_epochs: 100
 #qos: "qos_gpu-dev"
 qos: "qos_gpu-t4"
 #max_steps: 100000
-slurm_time: "01:00:00"
+slurm_time: "1:00:00"
 seed: 0
 depth_multiplier: 1
 train_dataset:
   _target_: ipsl_dcpp.model.ipsl_dataset.IPSL_DCPP
   domain: train
   lead_time_months: 1
-  delta: False
+  delta: True
+  normalization: 'climatology'
+  generate_statistics: False
 
 val_dataset:
   _target_: ipsl_dcpp.model.ipsl_dataset.IPSL_DCPP
   domain: val
   lead_time_months: 1
   delta: True
-  
+  normalization: 'climatology'
+  generate_statistics: False
+
 module:
   _target_: ipsl_dcpp.model.forecast.ForecastModule
   delta: False
-  lr: 0.0001
-  weight_decay: 0.00001
+  lr: 0.05
+  weight_decay: 0.001
   num_warmup_steps: 500
   num_training_steps: 300000
   num_cycles: 0.5
@@ -38,7 +42,7 @@ module:
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
   soil: True
-  conv_head: False
+  conv_head: True
   lon_resolution: 144
   lat_resolution: 143
   emb_dim: 192
@@ -196,3 +200,4 @@ surface_variables: [
                 #   'gppTree'
                   ]
 depth_variables: ['mrsfl','mrsol','mrsll']
+plev_variables: ['hur','hus','o3','ta','ua','va','wap','zg']

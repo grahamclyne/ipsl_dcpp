@@ -83,8 +83,8 @@ class PanguWeather(nn.Module):
         # In addition, three constant masks(the topography mask, land-sea mask and soil type mask)
         #self.zdim = 8 if patch_size[0]==2 else 5 # 5 for patch size 4
         self.soil = soil
-    #    self.zdim = 17 if self.soil else 11
-        self.zdim = 7 if self.soil else 1
+        self.zdim = 17 if self.soil else 11
+    #    self.zdim = 7 if self.soil else 1
         #this is some off by one error where the padding makes up for the fact that this is in fact 35x36 if i use lat_resolution and lon_resolution
         self.layer1_shape = (self.lon_resolution//self.patch_size[1], self.lon_resolution//self.patch_size[2])
         
@@ -103,12 +103,12 @@ class PanguWeather(nn.Module):
             in_chans=surface_ch,  
             embed_dim=emb_dim,
         )
-   #     self.plev_patchembed3d = PatchEmbed3D(
-   #         img_size=(19, lat_resolution, lon_resolution),
-   #         patch_size=patch_size,
-   #         in_chans=level_ch,
-   #         embed_dim=emb_dim
-   #     )
+        self.plev_patchembed3d = PatchEmbed3D(
+            img_size=(19, lat_resolution, lon_resolution),
+            patch_size=patch_size,
+            in_chans=level_ch,
+            embed_dim=emb_dim
+        )
         self.depth_patchembed3d = PatchEmbed3D(
             img_size=(11, lat_resolution, lon_resolution),
             patch_size=patch_size,
@@ -158,9 +158,9 @@ class PanguWeather(nn.Module):
 
         self.emb_dim = emb_dim
         if conv_head:
-           # self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=(135 * 1) + (8 * 19) + (3 * 11), downfactor=patch_size[-1])
             if(soil):
-                self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=(surface_ch * 1) + (depth_ch * 11), downfactor=patch_size[-1],soil=soil)
+                self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=(135 * 1) + (8 * 19) + (3 * 11), downfactor=patch_size[-1])
+               # self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=(surface_ch * 1) + (depth_ch * 11), downfactor=patch_size[-1],soil=soil)
             else:
                 self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=(surface_ch * 1), downfactor=patch_size[-1],soil=soil)
 
@@ -175,12 +175,8 @@ class PanguWeather(nn.Module):
             surface_mask (torch.Tensor): 2D 
             upper_air (torch.Tensor): 3D 
         """
-        #print(batch['state_surface'].shape)
-        #print(batch['state_depth'].shape)
         surface = batch['state_surface'].squeeze(-4)
-       # print('surface',surface)
-       # print('surface non nan',torch.nonzero(torch.isnan(surface.view(-1))))
-       # upper_air = batch['state_level']
+        upper_air = batch['state_level'].squeeze(-5)
         depth = batch['state_depth'].squeeze(-5)
         constants = batch['state_constant'].squeeze(-4)
         #forcings = batch['forcings']
@@ -188,67 +184,23 @@ class PanguWeather(nn.Module):
         time_step_conversion = np.vectorize(lambda x: x.month)
         timestep = torch.Tensor(time_step_conversion(dt)).to(surface.device)
         
-       # c = None
         c = self.time_embedding(timestep)
-       # c = None
-       # print('time_step_embedding shape',c.shape)
-       # print('forcings',forcings.shape)
-        #what does none here mean? 
         #pos_embs = self.positional_embeddings[None].expand((surface.shape[0], *self.positional_embeddings.shape))
-        
-        #dt = datetime.datetime.strptime(batch['time'][0],'%Y-%m')
-        #time_step = torch.Tensor(((dt.year - 1961) * 12) + dt.month) / ((2015-1961) * 12)
-        #timestep_embs = get_timestep_embedding(time_step,self.emb_dim)
-        #print(timestep_embs.shape)
-        #print(surface.shape)
-        
-        
-        #timestep = timestep.expand((1,1,surface.shape[-2],surface.shape[-1]))
-        #print(constants.shape)
-        #surface = surface.unsqueeze(3)
-        #surface = torch.concat([surface,constants], dim=1)
-        #surface = torch.concat([surface,constants],dim=1)
-        #print(surface.shape)
-        #print(depth.shape)
         surface = self.patchembed2d(surface)
-       # upper_air = self.plev_patchembed3d(upper_air)
-      #  print('surfae after embed',surface)
-       # print('null count',torch.isnan(surface.flatten()).sum() / len(surface.flatten()))
-
+        upper_air = self.plev_patchembed3d(upper_air)
         if(self.soil):
             depth = self.depth_patchembed3d(depth)
-          #  print('depth ',depth)
-       #     print('null count',torch.isnan(depth.flatten()).sum() / len(depth.flatten()))
-
-            #x = torch.concat([surface.unsqueeze(2), upper_air,depth], dim=2)
-            x = torch.concat([surface.unsqueeze(2),depth], dim=2)
+            x = torch.concat([surface.unsqueeze(2),depth,upper_air], dim=2)
         else:
             x = surface.unsqueeze(2)
         B, C, Pl, Lat, Lon = x.shape
-       # x = torch.nan_to_num(x,0)
         x = x.reshape(B, C, -1).transpose(1, 2)
-     #   print('right before layer1',x[0][0])
-     #   print(x.shape)
-      #  print('null count',torch.isnan(x.flatten()).sum() / len(x.flatten()))
         x = self.layer1(x,c)
-     #   print('after later1',x[0][0])
-     #   print(x.shape)
         skip = x
         x = self.downsample(x)
-     #   print('downsampled',x)
-        #it = int'lead_time_hours', 24)//24)
         
         x = self.layer2(x,c)
         x = self.layer3(x,c)
-      #  print('after layer3',x)
-        #it3 = (batch['lead_time_hours'] == 72)[..., None].float().expand_as(x)
-        
-        #x72 = x
-        #for i in range(2):
-        #    x72 = self.layer2(x72)
-        #    x72 = self.layer3(x72)
-            
-        #x = x*(1-it3) + x72*it3
         latent = x    
         x = self.upsample(x)
         if self.use_skip and skip is not None:
@@ -261,7 +213,7 @@ class PanguWeather(nn.Module):
         if not self.conv_head:
             output_surface = output[:, :, 0, :, :]
             if(self.soil):
-             #  output_upper_air = output[:, :, 1:-6, :, :]
+                #output_upper_air = output[:, :, 1:-6, :, :]
                # output_depth = output[:,:,-6:,:,:]
                 output_depth = output[:,:,1:,:,:]
                 output_surface = self.patchrecovery2d(output_surface)
@@ -276,7 +228,7 @@ class PanguWeather(nn.Module):
                 output_surface = self.patchrecovery2d(output_surface)
           #      output_level = self.plev_patchrecovery3d(output_upper_air)
                 out = dict(latent=latent,
-                        #    next_state_level=output_level, 
+                            next_state_level=output_level, 
                             next_state_surface=output_surface,
                              next_state_depth=torch.empty(0))              
                # print('output_surface_shape',output_surface.shape)
@@ -284,14 +236,11 @@ class PanguWeather(nn.Module):
 
         else:
          #   output_level, output_surface,output_depth = self.patchrecovery(output)
-        #    print('conv_head')
-            output_surface,output_depth = self.patchrecovery(output)
-         #   print(output_surface.shape,output_depth.shape)
-
-           # print('output_level',output_level.shape)
-            #print('output_surface',output_surface.shape)
+            output_surface,output_depth,output_level = self.patchrecovery(output)
             out = dict(latent=latent,
-                    #    next_state_level=output_level, 
+                        next_state_level=output_level, 
+                       state_surface=batch['state_surface'],
+                       state_depth=batch['state_depth'],
                         next_state_surface=output_surface,
                         next_state_depth=output_depth)
         return out
