@@ -54,7 +54,7 @@ backbone:
   depth_multiplier: 2
   position_embs_dim: 0
   surface_ch: 91
-  level_ch: 0
+  level_ch: 8
   depth_ch: 3
   use_skip: False
   delta: False

@@ -9,6 +9,7 @@ import submitit
 import os
 from pathlib import Path
 
+torch.set_default_dtype(torch.float32)
 
 
 
@@ -78,7 +79,7 @@ def train(cfg,run_id):
         log_every_n_steps=100,
        # max_steps=cfg.experiment.max_steps if not cfg.debug else 10,
         logger=wandb_logger,
-      #  precision="16-mixed",
+        precision="16-mixed",
         profiler='simple' if cfg.debug else None,
         devices=cfg.experiment.num_gpus,
         strategy='ddp_find_unused_parameters_true' if ((cfg.experiment.num_gpus > 1) and not cfg.experiment.backbone.soil) else 'ddp' if cfg.experiment.num_gpus > 1 else 'auto',

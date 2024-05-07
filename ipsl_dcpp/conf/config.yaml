@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - environment: jean_zay
+  - environment: local
   - experiment: one_month_multiple_variable_v100
 #to override, use: python run.py environment=cleps
 
