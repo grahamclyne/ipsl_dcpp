@@ -78,18 +78,22 @@ class UNet2(pl.LightningModule):
         self.save_hyperparameters()
         self.learning_rate = 0.0001
         self.weight_decay = 0.0001
+        self.act_fn = nn.ReLU()
+
         self.n_channels = n_channels
+        self.dense_1 = nn.Linear(in_features=91, out_features=144)
+
         self.inc = (DoubleConv(n_channels, 64))
         self.down1 = (Down(64, 128))
         self.down2 = (Down(128, 256))
-        self.down3 = (Down(256, 512))
-        self.down4 = (Down(512, 1024))
+      #  self.down3 = (Down(256, 512))
+      #  self.down4 = (Down(512, 1024))
         #self.down5 = (Down(1024, 2048))
         #self.down6 = Down(2048,4096)
         #self.up1 = Up(4096,2048)
         #self.up2 = (Up(2048,1024))
-        self.up3 = (Up(1024, 512))
-        self.up4 = (Up(512, 256))
+      #  self.up3 = (Up(1024, 512))
+    #    self.up4 = (Up(512, 256))
         self.up5 = (Up(256, 128))
         self.up6 = (Up(128, 64))
         self.outc = (OutConv(64, n_out_channels))
@@ -98,20 +102,24 @@ class UNet2(pl.LightningModule):
       #  self.recall = torchmetrics.Recall(task='multiclass',average='macro',num_classes=n_classes)
       #  self.confmat = ConfusionMatrix(task='multiclass',num_classes=n_classes)
 
-    def forward(self, x):
+    def forward(self, x,t):
         x1 = self.inc(x)
-        x2 = self.down1(x1)
+        print(x1.shape)
+        x1_embed = x1 + self.dense_1(self.act_fn(t.to(torch.float)))
+        print(x1_embed.shape)
+        x2 = self.down1(x1_embed)
+
         x3 = self.down2(x2)
-        x4 = self.down3(x3)
-        x5 = self.down4(x4)
+      #  x4 = self.down3(x3)
+    #    x5 = self.down4(x4)
         #x6 = self.down5(x5)
         #x7 = self.down6(x6)
         #x = self.up1(x7, x6)
         #x = self.up2(x6, x5)
-        x = self.up3(x5, x4)
-        x = self.up4(x, x3)
-        x = self.up5(x, x2)
-        x = self.up6(x, x1)
+     #   x = self.up3(x5, x4)
+     #   x = self.up4(x, x3)
+        x = self.up5(x3, x2)
+        x = self.up6(x2, x1_embed)
         logits = self.outc(x)
         return logits
 

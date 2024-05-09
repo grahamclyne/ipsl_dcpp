@@ -35,12 +35,12 @@ class DiffusionModule(ForecastModule):
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
 
-        input_surface = torch.cat([#batch['state_surface'], 
+        input_surface = torch.cat([batch['state_surface'], 
                                    batch['state_constant'], 
                                    batch['pred_state_surface'],
                                    batch['surface_noisy']], dim=1)
         input_surface = input_surface.squeeze(-3)
-        input_level = torch.cat([#batch['state_level'],
+        input_level = torch.cat([batch['state_level'],
                                    batch['pred_state_level'],
                                    batch['level_noisy']], dim=1)
         
@@ -52,9 +52,17 @@ class DiffusionModule(ForecastModule):
 
         cond_emb = month_emb + hour_emb + timestep_emb
 
-        out = self.backbone(input_surface, input_level, cond_emb)
+        dt = np.vectorize(datetime.datetime.strptime)(batch['time'],'%Y-%m')
+        time_step_conversion = np.vectorize(lambda x: x.month)
+        timestep = torch.Tensor(time_step_conversion(dt)).to(surface.device)
         
-        return out
+        c = self.time_embedding(timestep)
+        #pos_embs = self.positional_embeddings[None].expand((surface.shape[0], *self.positional_embeddings.shape))
+        surface = self.patchembed2d(surface)
+        upper_air = self.plev_patchembed3d(upper_air)
+        depth = self.depth_patchembed3d(depth)
+        x = torch.concat([surface.unsqueeze(2),depth,upper_air], dim=2)
+        return x
     
     def training_step(self, batch, batch_nb):
         # sample timesteps
