@@ -75,7 +75,8 @@ class PanguWeather(nn.Module):
                  use_skip,
                  conv_head,
                  soil,
-                delta
+                delta,
+                plev
                 ):
         super().__init__()
         self.__dict__.update(locals())
@@ -83,7 +84,8 @@ class PanguWeather(nn.Module):
         # In addition, three constant masks(the topography mask, land-sea mask and soil type mask)
         #self.zdim = 8 if patch_size[0]==2 else 5 # 5 for patch size 4
         self.soil = soil
-        self.zdim = 17 if self.soil else 11
+      #  self.zdim = 17 if self.soil else 11
+        self.zdim = 1
     #    self.zdim = 7 if self.soil else 1
         #this is some off by one error where the padding makes up for the fact that this is in fact 35x36 if i use lat_resolution and lon_resolution
         self.layer1_shape = (self.lon_resolution//self.patch_size[1], self.lon_resolution//self.patch_size[2])
@@ -158,17 +160,19 @@ class PanguWeather(nn.Module):
 
         self.emb_dim = emb_dim
         if conv_head:
-            if(soil):
-                self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=(135 * 1) + (8 * 19) + (3 * 11), downfactor=patch_size[-1])
-               # self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=(surface_ch * 1) + (depth_ch * 11), downfactor=patch_size[-1],soil=soil)
-            else:
-                self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=(surface_ch * 1), downfactor=patch_size[-1],soil=soil)
+            output_dim = (surface_ch * 1)
+            if(self.soil):
+                output_dim += (depth_ch * 11)
+            if(self.plev):
+                output_dim += (level_ch * 19)
+
+            self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=output_dim,soil=self.soil,plev=self.plev)
 
         else:
             self.patchrecovery2d = PatchRecovery2D((lat_resolution, lon_resolution), patch_size[1:], out_dim, surface_ch)
           #  self.plev_patchrecovery3d = PatchRecovery3D((19, lat_resolution, lon_resolution), patch_size, out_dim, level_ch)
             self.depth_patchrecovery3d = PatchRecovery3D((11, lat_resolution, lon_resolution), patch_size, out_dim, depth_ch)
-    def forward(self, batch, **kwargs):
+    def forward(self, batch,c, **kwargs):
         """
         Args:
             surface (torch.Tensor): 2D 
@@ -176,23 +180,27 @@ class PanguWeather(nn.Module):
             upper_air (torch.Tensor): 3D 
         """
         surface = batch['state_surface'].squeeze(-4)
-        upper_air = batch['state_level'].squeeze(-5)
-        depth = batch['state_depth'].squeeze(-5)
+        if(self.plev):
+            upper_air = batch['state_level'].squeeze(-5)
+        if(self.soil):
+            depth = batch['state_depth'].squeeze(-5)
         constants = batch['state_constant'].squeeze(-4)
         #forcings = batch['forcings']
-        dt = np.vectorize(datetime.datetime.strptime)(batch['time'],'%Y-%m')
-        time_step_conversion = np.vectorize(lambda x: x.month)
-        timestep = torch.Tensor(time_step_conversion(dt)).to(surface.device)
+       # dt = np.vectorize(datetime.datetime.strptime)(batch['time'],'%Y-%m')
+       # time_step_conversion = np.vectorize(lambda x: x.month)
+       # timestep = torch.Tensor(time_step_conversion(dt)).to(surface.device)
         
-        c = self.time_embedding(timestep)
+       # c = self.time_embedding(timestep)
         #pos_embs = self.positional_embeddings[None].expand((surface.shape[0], *self.positional_embeddings.shape))
         surface = self.patchembed2d(surface)
-        upper_air = self.plev_patchembed3d(upper_air)
+        x = surface.unsqueeze(2)
         if(self.soil):
             depth = self.depth_patchembed3d(depth)
-            x = torch.concat([surface.unsqueeze(2),depth,upper_air], dim=2)
-        else:
-            x = surface.unsqueeze(2)
+            x = torch.concat([x,depth], dim=2)
+        if(self.plev):
+            upper_air = self.plev_patchembed3d(upper_air)
+            x = torch.concat([x,upper_air], dim=2)
+        
         B, C, Pl, Lat, Lon = x.shape
         x = x.reshape(B, C, -1).transpose(1, 2)
         x = self.layer1(x,c)

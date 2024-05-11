@@ -119,7 +119,9 @@ class PatchRecovery3(nn.Module):
         dim=192,
         downfactor=4,
         output_dim=137,
-                soil=True):
+        soil=True,
+        plev=True
+        ):
 # input dim equals input_dim*z since we will be flattening stuff ?
         super().__init__()
         self.downfactor = downfactor
@@ -138,6 +140,7 @@ class PatchRecovery3(nn.Module):
        #     GeLU())
         self.proj = nn.Conv2d(4*dim, output_dim, kernel_size=(4,5), stride=1, padding=(1,2))
         self.soil = soil
+        self.plev = plev
 
     def forward(self, x):
         #print('before',x.shape)
@@ -154,8 +157,10 @@ class PatchRecovery3(nn.Module):
         output_surface = x[:,:91]
         if(self.soil):
             output_depth = x[:,91:94].reshape((x.shape[0],3,11,*x.shape[-2:]))
-            output_plev = x[:,94:].reshape((x.shape[0],8,19,*x.shape[-2:]))
-            return output_surface,output_depth,output_plev
         else:
-            return output_surface,torch.empty(0)
-       # return output, output_surface,output_depth
+            output_depth = None
+        if(self.plev):
+            output_plev = x[:,94:].reshape((x.shape[0],8,19,*x.shape[-2:]))
+        else:
+            output_plev = None
+        return output_surface,output_depth,output_plev

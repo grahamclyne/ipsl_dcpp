@@ -136,7 +136,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         next_month_index = int(next_time.split('-')[-1]) - 1 
         cur_year_index = int(time.split('-')[0]) - 1960
         next_year_index = int(next_time.split('-')[0]) - 1960
-        #cur_year_forcings = np.broadcast_to(np.expand_dims(self.atmos_forcings[:,cur_year_index],(1,2)),(4,143,144))
+        cur_year_forcings = np.broadcast_to(np.expand_dims(self.atmos_forcings[:,cur_year_index],(1,2)),(4,143,144))
         if(not self.generate_statistics):
             if(self.normalization == 'climatology'):
                 input_surface_variables = (input_surface_variables - self.surface_means[cur_month_index]) / (self.surface_stds[cur_month_index])
@@ -184,7 +184,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                     next_state_depth=target_depth_variables,
                     time=time,
                     next_time=next_time,
-           # forcings=cur_year_forcings
+                    forcings=cur_year_forcings
                 ))
 
 

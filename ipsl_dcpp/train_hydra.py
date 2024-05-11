@@ -38,7 +38,7 @@ def train(cfg,run_id):
         for key,value in conf.items():
             wandb_logger.experiment.config[key] = value
         wandb_logger.experiment.name = run_id
-    torch.set_float32_matmul_precision('medium')
+   # torch.set_float32_matmul_precision('medium')
     pl.seed_everything(cfg.experiment.seed)
     bar = TQDMProgressBar(refresh_rate=1)
     train = hydra.utils.instantiate(
@@ -94,7 +94,7 @@ def train(cfg,run_id):
         backbone=hydra.utils.instantiate(
             cfg.experiment.backbone,
         ),
-        dataset=val_dataloader.dataset
+       # dataset=val_dataloader.dataset
     )
 
     trainer.fit(

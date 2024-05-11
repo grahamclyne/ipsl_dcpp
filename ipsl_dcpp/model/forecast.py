@@ -30,7 +30,6 @@ class ForecastModule(pl.LightningModule):
         self.backbone = backbone # necessary to put it on device
        # self.climatology = torch.from_numpy(np.load('../data/climatology_from_train.npy'))
         self.save_hyperparameters(ignore=['backbone'])
-
     def init_from_ckpt(self, path, ignore_keys=list()):
         sd = torch.load(path, map_location="cpu")["state_dict"]
         keys = list(sd.keys())
@@ -51,7 +50,7 @@ class ForecastModule(pl.LightningModule):
         for k, v in dct.items():
             self.log(mode+k, v, prog_bar=True,sync_dist=True)
             
-    def loss(self, pred, batch, lat_coeffs=lat_coeffs_equi):
+    def loss(self, pred, batch, lat_coeffs=lat_coeffs_equi):            
         device = batch['next_state_surface'].device
         mse_surface = (pred['next_state_surface'] - batch['next_state_surface']).abs().pow(2)
         mse_level = (pred['next_state_level'] - batch['next_state_level']).abs().pow(2)
