@@ -45,11 +45,17 @@ def train(cfg,run_id):
         cfg.experiment.train_dataset,
         surface_variables=cfg.experiment.surface_variables,
         depth_variables=cfg.experiment.depth_variables,
+        plev_variables=cfg.experiment.plev_variables,
+        work_path=cfg.environment.work_path,
+        scratch_path=cfg.environment.scratch_path,
     )
     val = hydra.utils.instantiate(
         cfg.experiment.val_dataset,
         surface_variables=cfg.experiment.surface_variables,
         depth_variables=cfg.experiment.depth_variables,
+        plev_variables=cfg.experiment.plev_variables,
+        work_path=cfg.environment.work_path,
+        scratch_path=cfg.environment.scratch_path,
     )
     train_dataloader = torch.utils.data.DataLoader(
         train,

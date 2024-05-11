@@ -84,8 +84,9 @@ class PanguWeather(nn.Module):
         # In addition, three constant masks(the topography mask, land-sea mask and soil type mask)
         #self.zdim = 8 if patch_size[0]==2 else 5 # 5 for patch size 4
         self.soil = soil
-      #  self.zdim = 17 if self.soil else 11
-        self.zdim = 1
+        
+      #  self.zdim = zdim + 6 if self.soil else 11
+        
     #    self.zdim = 7 if self.soil else 1
         #this is some off by one error where the padding makes up for the fact that this is in fact 35x36 if i use lat_resolution and lon_resolution
         self.layer1_shape = (self.lon_resolution//self.patch_size[1], self.lon_resolution//self.patch_size[2])
