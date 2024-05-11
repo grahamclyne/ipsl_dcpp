@@ -7,7 +7,7 @@ import os
 import numpy as np
 from hydra import compose, initialize
 
-with initialize(version_base=None, config_path="conf"):
+with initialize(version_base=None, config_path="../conf"):
     cfg = compose(config_name="config")
 work_dir = os.environ['WORK']
 store_dir = os.environ['STORE'] 

@@ -21,7 +21,10 @@ train = hydra.utils.instantiate(
     generate_statistics=False,
     surface_variables=cfg.experiment.surface_variables,
     depth_variables=cfg.experiment.depth_variables,
-    delta=False
+    delta=False,
+    plev_variables=cfg.experiment.plev_variables,
+    work_path=cfg.environment.work_path,
+    scratch_path=cfg.environment.scratch_path,
 )
 train_dataloader = torch.utils.data.DataLoader(
     train,
@@ -29,22 +32,23 @@ train_dataloader = torch.utils.data.DataLoader(
     shuffle=True,
     num_workers=1,
 )
-surface_means_out = []
-surface_stds_out = []
-depth_means_out = []
-depth_stds_out = []
+
 iter_batch = iter(train_dataloader)
 
 surface_deltas = []
 depth_deltas = []
+plev_deltas = []
+
 for count in range(1000):
     print(count)
     batch = next(iter_batch)
-    surface_delta = (batch['next_state_surface'] - batch['state_surface']).squeeze()
-    depth_delta = (batch['next_state_depth'] - batch['state_depth']).squeeze()
-    print(np.nanmean(surface_delta))
-    depth_deltas.append(depth_delta)
-    surface_deltas.append(surface_delta)
-    
-np.save('surface_delta_std',np.nanstd(np.stack(surface_deltas),axis=0))
-np.save('depth_delta_std',np.nanstd(np.stack(depth_deltas),axis=0))
+   # surface_delta = (batch['next_state_surface'] - batch['state_surface']).squeeze()
+   # depth_delta = (batch['next_state_depth'] - batch['state_depth']).squeeze()
+    plev_delta = (batch['next_state_level'] - batch['state_level']).squeeze()
+   # depth_deltas.append(depth_delta)
+   # surface_deltas.append(surface_delta)
+    plev_deltas.append(plev_delta)
+
+#np.save('surface_delta_std',np.nanstd(np.stack(surface_deltas),axis=0))
+#np.save('depth_delta_std',np.nanstd(np.stack(depth_deltas),axis=0))
+np.save('plev_delta_std',np.nanstd(np.stack(plev_deltas),axis=0))
