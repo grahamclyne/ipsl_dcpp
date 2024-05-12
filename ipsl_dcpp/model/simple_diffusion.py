@@ -14,7 +14,8 @@ class SimpleDiffusion(pl.LightningModule):
         weight_decay,
         num_warmup_steps,
         num_training_steps,
-        num_cycles
+        num_cycles,
+        dataset
     ):
         super().__init__()
         self.__dict__.update(locals())
@@ -22,6 +23,7 @@ class SimpleDiffusion(pl.LightningModule):
         self.timestep_embedder = TimestepEmbedder(256)
         self.num_diffusion_timesteps = num_diffusion_timesteps
         self.backbone = backbone # necessary to put it on device
+        self.dataset = dataset
         self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_diffusion_timesteps,
                                                        beta_schedule='squaredcos_cap_v2',
                                                        beta_start=0.0001,
@@ -117,8 +119,8 @@ class SimpleDiffusion(pl.LightningModule):
             
         #   loss = (mse_surface_w.sum(1).mean((-3, -2, -1)) + 
         #           mse_level_w.sum(1).mean((-3, -2, -1)))/nvar
-            loss = mse_surface_w.sum(1).mean((-3, -2, -1))
-            return mse_surface, _, loss
+            loss = mse_surface.sum(1).mean((-3, -2, -1))
+            return mse_surface, None, loss
             
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), 

@@ -6,7 +6,6 @@ import torch
 import numpy as np
 import pickle
 
-torch.set_default_dtype(torch.float32)
 
 class IPSL_DCPP(torch.utils.data.Dataset):
     def __init__(self,
@@ -34,18 +33,20 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.normalization = normalization
         self.var_mask = torch.from_numpy(np.load(f'{self.work}/data/land_mask.npy'))
    #     self.files = list(glob.glob(f'{self.scratch}/1970*.nc'))
-        
+        lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
+        self.lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
        #by year
-        # self.files = dict(
-       #             all_=[str(x) for x in self.files],
-       #             train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,1965))])],
-       #             val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2000,2005))])],
-       #             test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2012,2014))])])[domain]
         self.files = dict(
-                    all_=[str(x) for x in self.files],
-                    train= [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])],
-                    val =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(8,10)])],
-                    test =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(10,11)])])[domain]
+                   all_=[str(x) for x in self.files],
+                   train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,2009))])],
+                   val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2010,2013))])],
+                   test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2013,2016))])])[domain]
+        #by ensemble member
+        # self.files = dict(
+        #             all_=[str(x) for x in self.files],
+        #             train= [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])],
+        #             val =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(8,10)])],
+        #             test =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(10,11)])])[domain]
        # [str(x) for x in files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])]
         self.nfiles = len(self.files)
         self.xr_options = dict(engine='netcdf4', cache=True)
@@ -136,7 +137,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         next_month_index = int(next_time.split('-')[-1]) - 1 
         cur_year_index = int(time.split('-')[0]) - 1960
         next_year_index = int(next_time.split('-')[0]) - 1960
-        cur_year_forcings = np.broadcast_to(np.expand_dims(self.atmos_forcings[:,cur_year_index],(1,2)),(4,143,144))
+      #  cur_year_forcings = np.broadcast_to(np.expand_dims(self.atmos_forcings[:,cur_year_index],(1,2)),(4,143,144))
+        cur_year_forcings = []
         if(not self.generate_statistics):
             if(self.normalization == 'climatology'):
                 input_surface_variables = (input_surface_variables - self.surface_means[cur_month_index]) / (self.surface_stds[cur_month_index])

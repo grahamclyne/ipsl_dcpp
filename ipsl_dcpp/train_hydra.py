@@ -100,7 +100,7 @@ def train(cfg,run_id):
         backbone=hydra.utils.instantiate(
             cfg.experiment.backbone,
         ),
-       # dataset=val_dataloader.dataset
+        dataset=val_dataloader.dataset
     )
 
     trainer.fit(

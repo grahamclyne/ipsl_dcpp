@@ -84,7 +84,7 @@ class PanguWeather(nn.Module):
         # In addition, three constant masks(the topography mask, land-sea mask and soil type mask)
         #self.zdim = 8 if patch_size[0]==2 else 5 # 5 for patch size 4
         self.soil = soil
-        
+        self.zdim = 1 
       #  self.zdim = zdim + 6 if self.soil else 11
         
     #    self.zdim = 7 if self.soil else 1
