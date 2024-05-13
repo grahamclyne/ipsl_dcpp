@@ -36,17 +36,17 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
         self.lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
        #by year
-        self.files = dict(
-                   all_=[str(x) for x in self.files],
-                   train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,2009))])],
-                   val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2010,2013))])],
-                   test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2013,2016))])])[domain]
+        #self.files = dict(
+        #           all_=[str(x) for x in self.files],
+        #           train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,2009))])],
+        #           val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2010,2013))])],
+        #           test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2013,2016))])])[domain]
         #by ensemble member
-        # self.files = dict(
-        #             all_=[str(x) for x in self.files],
-        #             train= [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])],
-        #             val =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(8,10)])],
-        #             test =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(10,11)])])[domain]
+        self.files = dict(
+                     all_=[str(x) for x in self.files],
+                     train= [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])],
+                     val =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(8,10)])],
+                     test =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(10,11)])])[domain]
        # [str(x) for x in files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])]
         self.nfiles = len(self.files)
         self.xr_options = dict(engine='netcdf4', cache=True)

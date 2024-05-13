@@ -42,11 +42,11 @@ class SimpleDiffusion(pl.LightningModule):
     def forward(self, batch, timesteps, sel=1):
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
-        # print(sel.shape)
+      #  print(sel.shape)
         # print(batch['surface_noisy'].shape)
         # print(batch['state_surface'].shape)
               
-        batch['state_surface'] = torch.cat([batch['state_surface']*sel, 
+        batch['state_surface'] = torch.cat([batch['state_surface'], 
                                     batch['surface_noisy']], dim=2)
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
         month_emb = self.month_embedder(month)

@@ -118,7 +118,7 @@ class PatchRecovery3(nn.Module):
         input_dim=None,
         dim=192,
         downfactor=4,
-        output_dim=137,
+        output_dim=10,
         soil=True,
         plev=True
         ):
@@ -154,7 +154,7 @@ class PatchRecovery3(nn.Module):
         #output_surface = x[:, :135]
       #  output = x[:, 135:287].reshape((x.shape[0], 8, 19, *x.shape[-2:]))
       #  output_depth = x[:,287:].reshape((x.shape[0],3,11,*x.shape[-2:]))
-        output_surface = x[:,:91]
+        output_surface = x[:,:output_dim]
         if(self.soil):
             output_depth = x[:,91:94].reshape((x.shape[0],3,11,*x.shape[-2:]))
         else:
