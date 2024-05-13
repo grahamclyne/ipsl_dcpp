@@ -1,8 +1,8 @@
 defaults:
   - _self_
-  - environment: local
+  - environment: jean_zay
   - experiment: one_month_diffusion
 #to override, use: python run.py environment=cleps
 
-project_name: ipsl_dcpp_emulation
+project_name: ipsl_dcpp_diffusion
 debug: False

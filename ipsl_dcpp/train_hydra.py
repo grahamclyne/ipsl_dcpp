@@ -80,7 +80,8 @@ def train(cfg,run_id):
 
     trainer = pl.Trainer(
         max_epochs=cfg.experiment.max_epochs,
-        callbacks=[bar,checkpoint_callback,ModelSummary(max_depth=-1)],
+    #    callbacks=[bar,checkpoint_callback,ModelSummary(max_depth=-1)],
+        callbacks=[bar,checkpoint_callback],
         enable_checkpointing=True,
         log_every_n_steps=100,
        # max_steps=cfg.experiment.max_steps if not cfg.debug else 10,

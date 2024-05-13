@@ -42,6 +42,10 @@ class SimpleDiffusion(pl.LightningModule):
     def forward(self, batch, timesteps, sel=1):
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
+        # print(sel.shape)
+        # print(batch['surface_noisy'].shape)
+        # print(batch['state_surface'].shape)
+              
         batch['state_surface'] = torch.cat([batch['state_surface']*sel, 
                                     batch['surface_noisy']], dim=2)
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
@@ -64,7 +68,7 @@ class SimpleDiffusion(pl.LightningModule):
         batch['surface_noisy'] = self.noise_scheduler.add_noise(batch['next_state_surface'], surface_noise, timesteps)
         #batch['level_noisy'] = self.noise_scheduler.add_noise(batch['next_state_level'], level_noise, timesteps)
 
-        batch['surface_noisy'] = self.noise_scheduler.scale_model_input(batch['surface_noisy'])[0]
+        batch['surface_noisy'] = self.noise_scheduler.scale_model_input(batch['surface_noisy'])
         #batch['level_noisy'] = self.noise_scheduler.scale_model_input(batch['level_noisy'])
 
         # Get the target for loss
@@ -73,7 +77,7 @@ class SimpleDiffusion(pl.LightningModule):
         
         # create uncond
         sel = (torch.rand((bs,), device=device))
-        pred = self.forward(batch, timesteps, sel.float()[:, None, None, None, None])
+        pred = self.forward(batch, timesteps, sel.float()[:, None,None, None, None])
         # compute loss
         batch['next_state_surface'] = target_surface
         #batch['next_state_level'] = target_level
