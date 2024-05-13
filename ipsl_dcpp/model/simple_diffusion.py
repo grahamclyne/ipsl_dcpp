@@ -63,7 +63,7 @@ class SimpleDiffusion(pl.LightningModule):
         timesteps = torch.randint(0, self.noise_scheduler.config.num_train_timesteps, (bs,), device=device).long()
 
         surface_noise = torch.randn_like(batch['next_state_surface'])
-        level_noise = torch.randn_like(batch['next_state_level'])
+        #level_noise = torch.randn_like(batch['next_state_level'])
 
         batch['surface_noisy'] = self.noise_scheduler.add_noise(batch['next_state_surface'], surface_noise, timesteps)
         #batch['level_noisy'] = self.noise_scheduler.add_noise(batch['next_state_level'], level_noise, timesteps)
@@ -72,20 +72,17 @@ class SimpleDiffusion(pl.LightningModule):
         #batch['level_noisy'] = self.noise_scheduler.scale_model_input(batch['level_noisy'])
 
         # Get the target for loss
-        target_surface = batch['next_state_surface']
+       # target_surface = batch['next_state_surface']
        # target_level = batch['next_state_level']
         
         # create uncond
-        sel = (torch.rand((bs,), device=device))
-        pred = self.forward(batch, timesteps, sel.float()[:, None,None, None, None])
+        # sel = (torch.rand((bs,), device=device))
+        pred = self.forward(batch, timesteps)
         # compute loss
-        batch['next_state_surface'] = target_surface
+      #  batch['next_state_surface'] = target_surface
         #batch['next_state_level'] = target_level
 
-        _, _, per_sample_loss_cond = self.loss(pred, batch)
-
-        loss = per_sample_loss_cond
-        self.mylog(cond_loss=per_sample_loss_cond.mean())
+        _, _, loss = self.loss(pred, batch)
         loss = loss.mean()
         self.mylog(loss=loss)
 

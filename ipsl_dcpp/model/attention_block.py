@@ -56,7 +56,7 @@ def window_partition(x: torch.Tensor, window_size):
     """
     B, Pl, Lat, Lon, C = x.shape
     win_pl, win_lat, win_lon = window_size
-    x = x.view(B, Pl // win_pl, win_pl, Lat // win_lat, win_lat, Lon // win_lon, win_lon, C)
+    x = x.contiguous().view(B, Pl // win_pl, win_pl, Lat // win_lat, win_lat, Lon // win_lon, win_lon, C)
     windows = x.permute(0, 5, 1, 3, 2, 4, 6, 7).contiguous().view(
         -1, (Pl // win_pl) * (Lat // win_lat), win_pl, win_lat, win_lon, C
     )
@@ -74,7 +74,7 @@ def window_reverse(windows, window_size, Pl, Lat, Lon):
     """
     win_pl, win_lat, win_lon = window_size
     B = int(windows.shape[0] / (Lon / win_lon))
-    x = windows.view(B, Lon // win_lon, Pl // win_pl, Lat // win_lat, win_pl, win_lat, win_lon, -1)
+    x = windows.contiguous().view(B, Lon // win_lon, Pl // win_pl, Lat // win_lat, win_pl, win_lat, win_lon, -1)
     x = x.permute(0, 2, 4, 3, 5, 1, 6, 7).contiguous().view(B, Pl, Lat, Lon, -1)
     return x
 
@@ -288,7 +288,7 @@ class EarthAttention3D(nn.Module):
         q = q * self.scale
         attn = (q @ k.transpose(-2, -1))
 
-        earth_position_bias = self.earth_position_bias_table[self.earth_position_index.view(-1)].view(
+        earth_position_bias = self.earth_position_bias_table[self.earth_position_index.contiguous().view(-1)].contiguous().view(
             self.window_size[0] * self.window_size[1] * self.window_size[2],
             self.window_size[0] * self.window_size[1] * self.window_size[2],
             self.type_of_windows, -1
@@ -299,8 +299,8 @@ class EarthAttention3D(nn.Module):
 
         if mask is not None:
             nLon = mask.shape[0]
-            attn = attn.view(B_ // nLon, nLon, self.num_heads, nW_, N, N) + mask.unsqueeze(1).unsqueeze(0)
-            attn = attn.view(-1, self.num_heads, nW_, N, N)
+            attn = attn.contiguous().view(B_ // nLon, nLon, self.num_heads, nW_, N, N) + mask.unsqueeze(1).unsqueeze(0)
+            attn = attn.contiguous().view(-1, self.num_heads, nW_, N, N)
             attn = self.softmax(attn)
         else:
             attn = self.softmax(attn)
@@ -386,7 +386,7 @@ class EarthSpecificBlock(nn.Module):
         if c is not None:
             shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = c.chunk(6, dim=1)
             x = x * (1 + scale_msa[:, None, :]) + shift_msa[:, None, :]
-        x = x.view(B, Pl, Lat, Lon, C)
+        x = x.contiguous().view(B, Pl, Lat, Lon, C)
         # start pad
         x = self.pad(x.permute(0, 4, 1, 2, 3)).permute(0, 2, 3, 4, 1)
 
@@ -408,7 +408,7 @@ class EarthSpecificBlock(nn.Module):
 
         attn_windows = self.attn(x_windows, mask=self.attn_mask)  # B*num_lon, num_pl*num_lat, win_pl*win_lat*win_lon, C
 
-        attn_windows = attn_windows.view(attn_windows.shape[0], attn_windows.shape[1], win_pl, win_lat, win_lon, C)
+        attn_windows = attn_windows.contiguous().view(attn_windows.shape[0], attn_windows.shape[1], win_pl, win_lat, win_lon, C)
 
         if self.roll:
             shifted_x = window_reverse(attn_windows, self.window_size, Pl_pad, Lat_pad, Lon_pad)

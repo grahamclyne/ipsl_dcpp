@@ -32,9 +32,9 @@ val_dataset:
 module:
   _target_: ipsl_dcpp.model.simple_diffusion.SimpleDiffusion
   num_diffusion_timesteps: 1000
-  lr: 0.0001
-  weight_decay: 0.001
-  betas: [0.9, 0.98]
+  lr: 3e-4
+  weight_decay: 0.01
+  betas: [0.9, 0.99]
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 300000
