@@ -207,22 +207,23 @@ class IPSL_DCPP(torch.utils.data.Dataset):
     #        batch['next_state_depth'] = batch['next_state_depth']*self.depth_delta_stds + batch['state_depth']
         if(self.normalization == 'climatology'):
             denorm_surface = lambda x,month_index: x.to(device)*torch.from_numpy(self.surface_stds[month_index]).to(device) + torch.from_numpy(self.surface_means[month_index]).to(device)
-            denorm_depth = lambda x,month_index: x.to(device)*torch.from_numpy(self.depth_stds[month_index]).to(device) + torch.from_numpy(self.depth_means[month_index]).to(device)
+      #      if(self.soil):
+       #         denorm_depth = lambda x,month_index: x.to(device)*torch.from_numpy(self.depth_stds[month_index]).to(device) + torch.from_numpy(self.depth_means[month_index]).to(device)
             
         elif(self.normalization == 'normal' or self.normalization == 'spatial_normal'):
             denorm_surface = lambda x,month_index: x.squeeze().to(device)*torch.from_numpy(self.surface_stds).to(device) + torch.from_numpy(self.surface_means).to(device)
-            denorm_depth = lambda x,month_index: x.squeeze().to(device)*torch.from_numpy(self.depth_stds).to(device) + torch.from_numpy(self.depth_means).to(device)    
+        #    denorm_depth = lambda x,month_index: x.squeeze().to(device)*torch.from_numpy(self.depth_stds).to(device) + torch.from_numpy(self.depth_means).to(device)    
             
         if(pred != None):
             pred = dict(#next_state_level=denorm_level(pred['next_state_level']),
                         next_state_surface=torch.where(self.var_mask,denorm_surface(pred['next_state_surface'],next_month),torch.nan),
-                        next_state_depth=denorm_depth(pred['next_state_depth'],next_month),
+               #         next_state_depth=denorm_depth(pred['next_state_depth'],next_month),
             )
 
         batch = dict(#next_state_level=denorm_level(batch['next_state_level']),
                     next_state_surface=torch.where(self.var_mask,denorm_surface(batch['next_state_surface'],next_month),torch.nan),
-                     next_state_depth=denorm_depth(batch['next_state_depth'],next_month),
-                      state_depth=denorm_depth(batch['state_depth'],next_month),
+           #          next_state_depth=denorm_depth(batch['next_state_depth'],next_month),
+            #          state_depth=denorm_depth(batch['state_depth'],next_month),
                     state_constant=batch['state_constant'],
                     state_surface=torch.where(self.var_mask==1,denorm_surface(batch['state_surface'],cur_month),torch.nan),
                     time=batch['time'],

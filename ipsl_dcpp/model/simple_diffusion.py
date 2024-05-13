@@ -42,14 +42,8 @@ class SimpleDiffusion(pl.LightningModule):
     def forward(self, batch, timesteps, sel=1):
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
-    
-        # elif self.conditional == 'state_only':
-        #     input_surface = torch.cat([batch['state_surface']*sel, 
-        #                             batch['state_constant'], 
-        #                             batch['surface_noisy']], dim=1)
-        #     input_level = torch.cat([batch['state_level']*sel,
-        #                             batch['level_noisy']], dim=1) 
-        # input_surface = input_surface.squeeze(-3)
+        batch['state_surface'] = torch.cat([batch['state_surface']*sel, 
+                                    batch['surface_noisy']], dim=2)
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
         month_emb = self.month_embedder(month)
         timestep_emb = self.timestep_embedder(timesteps)
@@ -70,7 +64,7 @@ class SimpleDiffusion(pl.LightningModule):
         batch['surface_noisy'] = self.noise_scheduler.add_noise(batch['next_state_surface'], surface_noise, timesteps)
         #batch['level_noisy'] = self.noise_scheduler.add_noise(batch['next_state_level'], level_noise, timesteps)
 
-        batch['surface_noisy'] = self.noise_scheduler.scale_model_input(batch['surface_noisy'])
+        batch['surface_noisy'] = self.noise_scheduler.scale_model_input(batch['surface_noisy'])[0]
         #batch['level_noisy'] = self.noise_scheduler.scale_model_input(batch['level_noisy'])
 
         # Get the target for loss
@@ -92,7 +86,6 @@ class SimpleDiffusion(pl.LightningModule):
         self.mylog(loss=loss)
 
         return loss
-
 
     def loss(self, pred, batch, lat_coeffs=None):
             if lat_coeffs is None:
@@ -135,3 +128,65 @@ class SimpleDiffusion(pl.LightningModule):
                         'interval': 'step', # or 'epoch'
                         'frequency': 1}
         return [opt], [sched]
+
+    def sample(self, batch, 
+                scheduler='ddpm',
+                num_inference_steps=50,
+                seed=0,
+                denormalize=True,
+                cf_guidance=None,
+                ):
+        if cf_guidance is None:
+            cf_guidance = 1
+        if scheduler == 'ddpm':
+            scheduler = self.noise_scheduler
+        # elif scheduler == 'ddim':
+        #     from diffusers import DDIMScheduler
+        #     sched_cfg = self.noise_scheduler.config
+        #     scheduler = DDIMScheduler(num_train_timesteps=sched_cfg.num_train_timesteps,
+        #                                                 beta_schedule=sched_cfg.beta_schedule,
+        #                                                 prediction_type=sched_cfg.prediction_type,
+        #                                                 beta_start=sched_cfg.beta_start,
+        #                                                 beta_end=sched_cfg.beta_end,
+        #                                                 clip_sample=False,
+        #                                                 clip_sample_range=1e6)
+            
+        scheduler.set_timesteps(num_inference_steps)
+
+        local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
+        generator = torch.Generator(device='cpu')
+        generator.manual_seed(seed)
+
+        surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
+        level_noise = torch.randn(local_batch['state_level'].size(), generator=generator)
+
+        local_batch['surface_noisy'] = surface_noise.to(self.device)
+        local_batch['level_noisy'] = level_noise.to(self.device)
+        steps = []
+        with torch.no_grad():
+            for t in scheduler.timesteps:
+                # 1. predict noise model_output
+                pred = self.forward(local_batch, torch.tensor([t]).to(self.device), (1 if cf_guidance > 0 else 0))
+                steps.append(pred['next_state_surface'][0,90])
+                # if cf_guidance > 1:
+                #     uncond_pred = self.forward(local_batch, torch.tensor([t]).to(self.device), 0)
+                #     # compute epsilon from uncond_pred 
+                #     pred = dict(next_state_surface=pred['next_state_surface']*(1+cf_guidance) - uncond_pred['next_state_surface']*cf_guidance,
+                #                 next_state_level=pred['next_state_level']*(1+cf_guidance) - uncond_pred['next_state_level']*cf_guidance)
+                
+                local_batch['surface_noisy'] = scheduler.step(pred['next_state_surface'], t, 
+                                                            local_batch['surface_noisy'], 
+                                                            generator=generator).prev_sample
+
+                # local_batch['level_noisy'] = scheduler.step(pred['next_state_level'], t, 
+                #                                             local_batch['level_noisy'], 
+                #                                             generator=generator).prev_sample
+                
+            sample = dict(next_state_surface=local_batch['surface_noisy'])
+            
+        denorm_sample = sample
+        if denormalize:
+            denorm_sample = self.dataset.denormalize(sample, batch)
+
+        #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
+        return denorm_sample,steps

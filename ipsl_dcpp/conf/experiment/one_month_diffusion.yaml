@@ -55,7 +55,7 @@ backbone:
   window_size: [2, 6, 12] 
   depth_multiplier: 2
   position_embs_dim: 0
-  surface_ch: 91
+  surface_ch: 182
   level_ch: 0
   depth_ch: 0
   use_skip: False
