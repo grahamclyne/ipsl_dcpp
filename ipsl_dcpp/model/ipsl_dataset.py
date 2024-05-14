@@ -51,6 +51,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.nfiles = len(self.files)
         self.xr_options = dict(engine='netcdf4', cache=True)
         self.lead_time_months = lead_time_months
+        variable_subset = [50, 87, 88, 89, 6, 25, 13, 14, 34]
         self.land_mask = np.expand_dims(np.load(f'{self.work}/data/land_mask.npy'),axis=(0,1))
        # self.surface_means = np.expand_dims(np.load(f'{self.work}/data/single_var_surface_means.npy'),axis=(0,1))
        # self.surface_stds = np.expand_dims(np.load(f'{self.work}/data/single_var_surface_stds.npy'),axis=(0,1))
@@ -61,8 +62,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         
         
         if(self.normalization == 'climatology'):
-            self.surface_means = np.load(f'{self.work}/data/climatology_surface_means.npy')[:,6]
-            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_surface_stds.npy'),(-2,-1)),(12,91,143,144))[:,6]
+            self.surface_means = np.load(f'{self.work}/data/climatology_surface_means.npy')[:,variable_subset]
+            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_surface_stds.npy'),(-2,-1)),(12,91,143,144))[:,variable_subset]
             self.depth_means = np.load(f'{self.work}/data/climatology_depth_means.npy')
            # self.depth_stds = np.load(f'{self.work}/data/climatology_depth_stds.npy')[:,0]
             self.depth_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_depth_stds.npy'),(-2,-1)),(12,3,11,143,144))
@@ -79,7 +80,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             self.surface_stds = np.nanmean(np.load(f'{self.work}/data/spatial_multi_var_surface_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
             self.depth_means = np.load(f'{self.work}/data/spatial_depth_means.npy').squeeze()
             self.depth_stds = np.nanmean(np.load(f'{self.work}/data/spatial_depth_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
-        self.surface_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/surface_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2))
+        self.surface_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/surface_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2))[:,variable_subset]
         self.depth_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/depth_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2))
       #  self.plev_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/plev_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2))
         self.plev_delta_stds = np.ones([8,19,143,144])
