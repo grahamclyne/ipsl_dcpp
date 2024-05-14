@@ -17,23 +17,23 @@ train_dataset:
   _target_: ipsl_dcpp.model.ipsl_dataset.IPSL_DCPP
   domain: train
   lead_time_months: 1
-  delta: True
-  normalization: 'climatology'
+  delta: False
+  normalization: 'normal'
   generate_statistics: False
 
 val_dataset:
   _target_: ipsl_dcpp.model.ipsl_dataset.IPSL_DCPP
   domain: val
   lead_time_months: 1
-  delta: True
-  normalization: 'climatology'
+  delta: False
+  normalization: 'normal'
   generate_statistics: False
 
 module:
   _target_: ipsl_dcpp.model.simple_diffusion.SimpleDiffusion
   num_diffusion_timesteps: 1000
-  lr: 3e-3
-  weight_decay: 1
+  lr: 3e-4
+  weight_decay: 0
   betas: [0.9, 0.99]
   num_warmup_steps: 500
   num_cycles: 0.5
@@ -54,12 +54,13 @@ backbone:
   window_size: [2, 6, 12] 
   depth_multiplier: 2
   position_embs_dim: 0
-  surface_ch: 182
+  surface_ch: 2
   level_ch: 0
   depth_ch: 0
   use_skip: False
   delta: False  
-surface_variables: [
+surface_variables: ['cVeg']
+surface_variables_x: [
 #'baresoilFrac',
  'c3PftFrac',
  'c4PftFrac',

@@ -43,8 +43,8 @@ class SimpleDiffusion(pl.LightningModule):
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
       #  print(sel.shape)
-       # print(batch['surface_noisy'].shape)
-       # print(batch['state_surface'].shape)
+     #   print(batch['surface_noisy'].shape)
+     #   print(batch['state_surface'].shape)
               
         batch['state_surface'] = torch.cat([batch['state_surface'], 
                                    batch['surface_noisy']], dim=2)
@@ -93,8 +93,10 @@ class SimpleDiffusion(pl.LightningModule):
             lat_coeffs = self.dataset.lat_coeffs_equi
     # surface_coeffs = pangu_surface_coeffs
         device = batch['next_state_level'].device
-        print(pred['next_state_surface'][0,90,100])
-        print(pred['next_state_surface'][0,0,90,100])
+        print(pred['next_state_surface'].shape)
+        print(batch['next_state_surface'].shape)
+        print(pred['next_state_surface'][0,0,100])
+        print(batch['next_state_surface'][0,0,0,100])
         mse_surface = (pred['next_state_surface'] - batch['next_state_surface']).pow(2)
 
         mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs

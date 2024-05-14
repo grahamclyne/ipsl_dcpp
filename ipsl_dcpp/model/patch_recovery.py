@@ -155,7 +155,7 @@ class PatchRecovery3(nn.Module):
         #output_surface = x[:, :135]
       #  output = x[:, 135:287].reshape((x.shape[0], 8, 19, *x.shape[-2:]))
       #  output_depth = x[:,287:].reshape((x.shape[0],3,11,*x.shape[-2:]))
-        print('after',x.shape)
+      #  print('after',x.shape)
         output_surface = x[:,:self.output_dim]
         if(self.soil):
             output_depth = x[:,91:94].reshape((x.shape[0],3,11,*x.shape[-2:]))

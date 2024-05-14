@@ -167,7 +167,7 @@ class PanguWeather(nn.Module):
                 output_dim += (depth_ch * 11)
             if(self.plev):
                 output_dim += (level_ch * 19)
-            print(output_dim)
+            #print(output_dim)
             self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=output_dim,soil=self.soil,plev=self.plev)
 
         else:
@@ -196,7 +196,7 @@ class PanguWeather(nn.Module):
         #pos_embs = self.positional_embeddings[None].expand((surface.shape[0], *self.positional_embeddings.shape))
         surface = self.patchembed2d(surface)
         x = surface.unsqueeze(2)
-        print(x.shape,'after unsqueeze,and embedding')
+        #print(x.shape,'after unsqueeze,and embedding')
         if(self.soil):
             depth = self.depth_patchembed3d(depth)
             x = torch.concat([x,depth], dim=2)
