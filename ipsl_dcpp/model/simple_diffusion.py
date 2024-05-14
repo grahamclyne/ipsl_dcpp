@@ -43,11 +43,11 @@ class SimpleDiffusion(pl.LightningModule):
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
       #  print(sel.shape)
-        # print(batch['surface_noisy'].shape)
-        # print(batch['state_surface'].shape)
+        print(batch['surface_noisy'].shape)
+        print(batch['state_surface'].shape)
               
         batch['state_surface'] = torch.cat([batch['state_surface'], 
-                                    batch['surface_noisy']], dim=2)
+                                    batch['surface_noisy'].squeeze(0)], dim=2)
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
         month_emb = self.month_embedder(month)
         timestep_emb = self.timestep_embedder(timesteps)
@@ -72,14 +72,14 @@ class SimpleDiffusion(pl.LightningModule):
         #batch['level_noisy'] = self.noise_scheduler.scale_model_input(batch['level_noisy'])
 
         # Get the target for loss
-       # target_surface = batch['next_state_surface']
+        target_surface = batch['next_state_surface']
        # target_level = batch['next_state_level']
         
         # create uncond
         # sel = (torch.rand((bs,), device=device))
         pred = self.forward(batch, timesteps)
         # compute loss
-      #  batch['next_state_surface'] = target_surface
+        batch['next_state_surface'] = target_surface
         #batch['next_state_level'] = target_level
 
         _, _, loss = self.loss(pred, batch)
@@ -89,32 +89,33 @@ class SimpleDiffusion(pl.LightningModule):
         return loss
 
     def loss(self, pred, batch, lat_coeffs=None):
-            if lat_coeffs is None:
-                lat_coeffs = self.dataset.lat_coeffs_equi
-        # surface_coeffs = pangu_surface_coeffs
-            device = batch['next_state_level'].device
-            mse_surface = (pred['next_state_surface'] - batch['next_state_surface']).pow(2)
+        if lat_coeffs is None:
+            lat_coeffs = self.dataset.lat_coeffs_equi
+    # surface_coeffs = pangu_surface_coeffs
+        device = batch['next_state_level'].device
+        mse_surface = (pred['next_state_surface'] - batch['next_state_surface']).pow(2)
 
-            mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
-        #   mse_surface_w = mse_surface.mul(surface_coeffs.to(device))
-        
-        # mse_level = (pred['next_state_level'] - batch['next_state_level']).pow(2)
-        # if mse_level.shape[-2] == 128:
-        #     mse_level = mse_level[..., 4:-4, 8:-8]
-        # mse_level = mse_level.mul(lat_coeffs.to(device))
-        # mse_level_w = mse_level.mul(level_coeffs.to(device))
+        mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
+    #   mse_surface_w = mse_surface.mul(surface_coeffs.to(device))
+    
+    # mse_level = (pred['next_state_level'] - batch['next_state_level']).pow(2)
+    # if mse_level.shape[-2] == 128:
+    #     mse_level = mse_level[..., 4:-4, 8:-8]
+    # mse_level = mse_level.mul(lat_coeffs.to(device))
+    # mse_level_w = mse_level.mul(level_coeffs.to(device))
 
-            #if self.selected_vars:
-            #    coeffs = 0.01*torch.ones(1, 5, 13, 1, 1).to(device)
-            #    coeffs[:, 0, 7] = 1
-            #    mse_level_w *= coeffs
+        #if self.selected_vars:
+        #    coeffs = 0.01*torch.ones(1, 5, 13, 1, 1).to(device)
+        #    coeffs[:, 0, 7] = 1
+        #    mse_level_w *= coeffs
+    
+    # nvar = (surface_coeffs.sum().item() + 5)
         
-        # nvar = (surface_coeffs.sum().item() + 5)
-            
-        #   loss = (mse_surface_w.sum(1).mean((-3, -2, -1)) + 
-        #           mse_level_w.sum(1).mean((-3, -2, -1)))/nvar
-            loss = mse_surface.sum(1).mean((-3, -2, -1))
-            return mse_surface, None, loss
+    #   loss = (mse_surface_w.sum(1).mean((-3, -2, -1)) + 
+    #           mse_level_w.sum(1).mean((-3, -2, -1)))/nvar
+        print(mse_surface.shape)
+        loss = mse_surface.sum(1).mean((-3, -2, -1))
+        return mse_surface, None, loss
             
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), 
