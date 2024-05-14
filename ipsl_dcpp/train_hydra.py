@@ -9,8 +9,6 @@ import submitit
 import os
 from pathlib import Path
 
-torch.set_default_dtype(torch.float32)
-
 
 
 def train(cfg,run_id):
@@ -89,8 +87,8 @@ def train(cfg,run_id):
         precision="16-mixed",
         profiler='simple' if cfg.debug else None,
         devices=cfg.experiment.num_gpus,
-        strategy='ddp_find_unused_parameters_true' if ((cfg.experiment.num_gpus > 1) and not cfg.experiment.backbone.soil) else 'ddp' if cfg.experiment.num_gpus > 1 else 'auto',
-       # strategy='ddp_find_unused_parameters_true',
+       # strategy='ddp_find_unused_parameters_true' if ((cfg.experiment.num_gpus > 1) and not cfg.experiment.backbone.soil) else 'ddp' if cfg.experiment.num_gpus > 1 else 'auto',
+        strategy='ddp',
         accelerator="gpu",
         #limit_train_batches=0.01 if cfg.debug else 1
         #limit_val_batches=0.01 if cfg.debug else 1,

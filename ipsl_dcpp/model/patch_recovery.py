@@ -118,7 +118,7 @@ class PatchRecovery3(nn.Module):
         input_dim=None,
         dim=192,
         downfactor=4,
-        output_dim=10,
+        output_dim=182,
         soil=True,
         plev=True
         ):
@@ -141,6 +141,7 @@ class PatchRecovery3(nn.Module):
         self.proj = nn.Conv2d(4*dim, output_dim, kernel_size=(4,5), stride=1, padding=(1,2))
         self.soil = soil
         self.plev = plev
+        self.output_dim = output_dim
 
     def forward(self, x):
         #print('before',x.shape)
@@ -154,13 +155,13 @@ class PatchRecovery3(nn.Module):
         #output_surface = x[:, :135]
       #  output = x[:, 135:287].reshape((x.shape[0], 8, 19, *x.shape[-2:]))
       #  output_depth = x[:,287:].reshape((x.shape[0],3,11,*x.shape[-2:]))
-        output_surface = x[:,:output_dim]
+        output_surface = x[:,:self.output_dim]
         if(self.soil):
             output_depth = x[:,91:94].reshape((x.shape[0],3,11,*x.shape[-2:]))
         else:
-            output_depth = None
+            output_depth = torch.empty(0)
         if(self.plev):
             output_plev = x[:,94:].reshape((x.shape[0],8,19,*x.shape[-2:]))
         else:
-            output_plev = None
+            output_plev = torch.empty(0)
         return output_surface,output_depth,output_plev

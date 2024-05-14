@@ -161,12 +161,12 @@ class PanguWeather(nn.Module):
 
         self.emb_dim = emb_dim
         if conv_head:
-            output_dim = (surface_ch * 1)
+            output_dim = int((surface_ch * 1) / 2)
             if(self.soil):
                 output_dim += (depth_ch * 11)
             if(self.plev):
                 output_dim += (level_ch * 19)
-
+            print(output_dim)
             self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=output_dim,soil=self.soil,plev=self.plev)
 
         else:
@@ -237,7 +237,7 @@ class PanguWeather(nn.Module):
                 output_surface = self.patchrecovery2d(output_surface)
           #      output_level = self.plev_patchrecovery3d(output_upper_air)
                 out = dict(latent=latent,
-                            next_state_level=output_level, 
+                            next_state_level=torch.empty(0), 
                             next_state_surface=output_surface,
                              next_state_depth=torch.empty(0))              
                # print('output_surface_shape',output_surface.shape)
