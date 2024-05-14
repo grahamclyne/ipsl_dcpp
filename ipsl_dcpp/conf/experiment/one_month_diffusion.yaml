@@ -2,7 +2,7 @@ name: 'ipsl_emulation'
 num_cpus_per_task: 20
 lead_time_months: 1
 #see http://www.idris.fr/eng/jean-zay/gpu/jean-zay-gpu-exec_partition_slurm-eng.html for gpu to cpu ratio for different partitions
-num_gpus: 2
+num_gpus: 1
 gpu_type: v100
 train_batch_size: 4
 val_batch_size: 4
@@ -17,7 +17,7 @@ train_dataset:
   _target_: ipsl_dcpp.model.ipsl_dataset.IPSL_DCPP
   domain: train
   lead_time_months: 1
-  delta: True
+  delta: False
   normalization: 'climatology'
   generate_statistics: False
 
@@ -25,7 +25,7 @@ val_dataset:
   _target_: ipsl_dcpp.model.ipsl_dataset.IPSL_DCPP
   domain: val
   lead_time_months: 1
-  delta: True
+  delta: False
   normalization: 'climatology'
   generate_statistics: False
 
@@ -54,7 +54,7 @@ backbone:
   window_size: [2, 6, 12] 
   depth_multiplier: 2
   position_embs_dim: 0
-  surface_ch: 18
+  surface_ch: 23
   level_ch: 0
   depth_ch: 0
   use_skip: False

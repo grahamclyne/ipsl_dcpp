@@ -160,7 +160,7 @@ class PanguWeather(nn.Module):
         # The outputs of the 2nd encoder layer and the 7th decoder layer are concatenated along the channel dimension.
 
         self.emb_dim = emb_dim
-        output_dim = int((surface_ch * 1)/2)
+        output_dim = 9
 
         if conv_head:
             if(self.soil):
