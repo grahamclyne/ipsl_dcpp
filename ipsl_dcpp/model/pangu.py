@@ -95,7 +95,7 @@ class PanguWeather(nn.Module):
         
         #self.positional_embeddings = nn.Parameter(torch.zeros((position_embs_dim, lat_resolution, lon_resolution)))
         #torch.nn.init.trunc_normal_(self.positional_embeddings, 0.02)
-        self.time_embedding = TimestepEmbedder(cond_dim)
+      #  self.time_embedding = TimestepEmbedder(cond_dim)
         #nn.init.normal_(self.time_embedding.mlp[0].weight, std=0.02)
         #nn.init.normal_(self.time_embedding.mlp[2].weight, std=0.02)
         self.loss = torch.nn.MSELoss()
@@ -106,18 +106,18 @@ class PanguWeather(nn.Module):
             in_chans=surface_ch,  
             embed_dim=emb_dim,
         )
-        self.plev_patchembed3d = PatchEmbed3D(
-            img_size=(19, lat_resolution, lon_resolution),
-            patch_size=patch_size,
-            in_chans=level_ch,
-            embed_dim=emb_dim
-        )
-        self.depth_patchembed3d = PatchEmbed3D(
-            img_size=(11, lat_resolution, lon_resolution),
-            patch_size=patch_size,
-            in_chans=depth_ch,
-            embed_dim=emb_dim
-        )
+        # self.plev_patchembed3d = PatchEmbed3D(
+        #     img_size=(19, lat_resolution, lon_resolution),
+        #     patch_size=patch_size,
+        #     in_chans=level_ch,
+        #     embed_dim=emb_dim
+        # )
+        # self.depth_patchembed3d = PatchEmbed3D(
+        #     img_size=(11, lat_resolution, lon_resolution),
+        #     patch_size=patch_size,
+        #     in_chans=depth_ch,
+        #     embed_dim=emb_dim
+        # )
         self.layer1 = CondBasicLayer(
             dim=emb_dim,
             cond_dim=cond_dim,
@@ -160,8 +160,9 @@ class PanguWeather(nn.Module):
         # The outputs of the 2nd encoder layer and the 7th decoder layer are concatenated along the channel dimension.
 
         self.emb_dim = emb_dim
+        output_dim = int((surface_ch * 1)/2)
+
         if conv_head:
-            output_dim = int((surface_ch * 1) / 2)
             if(self.soil):
                 output_dim += (depth_ch * 11)
             if(self.plev):
@@ -170,7 +171,7 @@ class PanguWeather(nn.Module):
             self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=output_dim,soil=self.soil,plev=self.plev)
 
         else:
-            self.patchrecovery2d = PatchRecovery2D((lat_resolution, lon_resolution), patch_size[1:], out_dim, surface_ch)
+            self.patchrecovery2d = PatchRecovery2D((lat_resolution, lon_resolution), patch_size[1:], out_dim, output_dim)
           #  self.plev_patchrecovery3d = PatchRecovery3D((19, lat_resolution, lon_resolution), patch_size, out_dim, level_ch)
             self.depth_patchrecovery3d = PatchRecovery3D((11, lat_resolution, lon_resolution), patch_size, out_dim, depth_ch)
     def forward(self, batch,c, **kwargs):
@@ -195,6 +196,7 @@ class PanguWeather(nn.Module):
         #pos_embs = self.positional_embeddings[None].expand((surface.shape[0], *self.positional_embeddings.shape))
         surface = self.patchembed2d(surface)
         x = surface.unsqueeze(2)
+        print(x.shape,'after unsqueeze,and embedding')
         if(self.soil):
             depth = self.depth_patchembed3d(depth)
             x = torch.concat([x,depth], dim=2)
