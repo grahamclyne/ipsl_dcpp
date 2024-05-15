@@ -36,17 +36,18 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
         self.lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
        #by year
-        #self.files = dict(
-        #           all_=[str(x) for x in self.files],
-        #           train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,2009))])],
-        #           val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2010,2013))])],
-        #           test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2013,2016))])])[domain]
-        #by ensemble member
         self.files = dict(
-                     all_=[str(x) for x in self.files],
-                     train= [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])],
-                     val =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(8,10)])],
-                     test =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(10,11)])])[domain]
+                  all_=[str(x) for x in self.files],
+            #need to go to only 2004 because atmos forcings only go to 2014
+                  train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,2004))])],
+                  val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2004,2013))])],
+                  test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2013,2016))])])[domain]
+        #by ensemble member
+        # self.files = dict(
+        #              all_=[str(x) for x in self.files],
+        #              train= [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])],
+        #              val =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(8,10)])],
+        #              test =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(10,11)])])[domain]
        # [str(x) for x in files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])]
         self.nfiles = len(self.files)
         self.xr_options = dict(engine='netcdf4', cache=True)
@@ -59,7 +60,6 @@ class IPSL_DCPP(torch.utils.data.Dataset):
      #   self.surface_stds = np.broadcast_to(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/climatology_surface_stds.npy'),axis=(-1,-2,-4)),(-1,-2)),(12,91,143,144))
      #   self.depth_means = np.broadcast_to(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/climatology_depth_means.npy'),axis=(-1,-2,-5)),(-1,-2)),(12,3,11,143,144))
      #   self.depth_stds = np.broadcast_to(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/climatology_depth_stds.npy'),axis=(-1,-2,-5)),(-1,-2)),(12,3,11,143,144))
-        
         
         if(self.normalization == 'climatology'):
             self.surface_means = np.load(f'{self.work}/data/climatology_surface_means.npy')[:,variable_subset]
@@ -138,7 +138,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         next_month_index = int(next_time.split('-')[-1]) - 1 
         cur_year_index = int(time.split('-')[0]) - 1960
         next_year_index = int(next_time.split('-')[0]) - 1960
-        cur_year_forcings = np.broadcast_to(np.expand_dims(self.atmos_forcings[:,cur_year_index],(1,2)),(4,143,144)).astype(np.float32)
+       # cur_year_forcings = np.broadcast_to(np.expand_dims(self.atmos_forcings[:,cur_year_index],(1,2)),(4,143,144)).astype(np.float32)
+        cur_year_forcings = self.atmos_forcings[:,cur_year_index]
        # cur_year_forcings = []
       #  cur_year_forcings = []
         if(not self.generate_statistics):
