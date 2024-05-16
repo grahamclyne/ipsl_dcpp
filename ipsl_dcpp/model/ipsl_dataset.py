@@ -139,7 +139,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         cur_year_index = int(time.split('-')[0]) - 1960
         next_year_index = int(next_time.split('-')[0]) - 1960
        # cur_year_forcings = np.broadcast_to(np.expand_dims(self.atmos_forcings[:,cur_year_index],(1,2)),(4,143,144)).astype(np.float32)
-        cur_year_forcings = self.atmos_forcings[:,cur_year_index]
+        cur_year_forcings = torch.Tensor(self.atmos_forcings[:,cur_year_index])
        # cur_year_forcings = []
       #  cur_year_forcings = []
         if(not self.generate_statistics):
@@ -158,9 +158,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
 
                 target_surface_variables = (target_surface_variables - self.surface_means) / self.surface_stds
                 target_depth_variables = (target_depth_variables - self.depth_means) / self.depth_stds
-            print(input_surface_variables.shape)
-            print(target_surface_variables.shape)
-            print(self.surface_delta_stds.shape,'surface_deltas')
+
             if(self.delta):
            # surface_mask = (self.surface_delta_stds != 0)
            # depth_mask = (self.depth_delta_stds != 0)
@@ -192,8 +190,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                     next_state_depth=target_depth_variables.type(torch.float32),
                     time=time,
                     next_time=next_time,
-                    forcings=cur_year_forcings.astype(np.float32)))
-
+                    forcings=cur_year_forcings.type(torch.float32)))
         return out
 
     
@@ -203,7 +200,10 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         cur_month = int(batch['time'][0].split('-')[-1]) - 1     
         next_month = int(batch['next_time'][0].split('-')[-1]) - 1    
         #   denorm_level = lambda x: x.to(device)*torch.from_numpy(self.plev_stds).to(device) + torch.from_numpy(self.plev_means).to(device)
-    #    if(self.delta):
+        if(self.delta):
+            batch_actual['next_state_surface'] = (batch['next_state_surface']*np.expand_dims(dataloader.dataset.surface_delta_stds,0)) + batch['state_surface']
+            pred['next_state_surface'] = (pred['next_state_surface']*np.expand_dims(dataloader.dataset.surface_delta_stds,0)) + batch['state_surface']
+
     #        if(pred != None):
     #            pred['next_state_surface'] = pred['next_state_surface']*self.surface_delta_stds + batch['state_surface']
     #            pred['next_state_depth'] = pred['next_state_depth']*self.depth_delta_stds + batch['state_depth']

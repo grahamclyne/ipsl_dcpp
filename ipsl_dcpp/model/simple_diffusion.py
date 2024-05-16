@@ -4,6 +4,17 @@ import diffusers
 import torch
 from ipsl_dcpp.model.pangu import TimestepEmbedder
 from ipsl_dcpp.evaluation.metrics import EnsembleMetrics
+import datetime
+import numpy as np
+def inc_time(batch_time):
+    batch_time = datetime.datetime.strptime(batch_time,'%Y-%m')
+    if(batch_time.month == 12):
+        year = batch_time.year + 1
+        month = 1
+    else:
+        year = batch_time.year
+        month = batch_time.month + 1
+    return f'{year}-{month}'
 
 
 class SimpleDiffusion(pl.LightningModule):
@@ -27,7 +38,7 @@ class SimpleDiffusion(pl.LightningModule):
         self.backbone = backbone # necessary to put it on device
         self.dataset = dataset
         self.metrics = EnsembleMetrics(dataset=dataset)
-        self.num_inference_steps = 5
+        self.num_inference_steps = 50
 
         self.num_members = 2
         self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_diffusion_timesteps,
@@ -50,16 +61,17 @@ class SimpleDiffusion(pl.LightningModule):
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
       #  print(sel.shape)
-        print(batch['surface_noisy'].shape)
-        print(batch['state_surface'].shape)
-        print(batch['state_constant'].shape)      
+ #       print(batch['surface_noisy'].shape)
+ #       print(batch['state_surface'].shape)
+ #       print(batch['state_constant'].shape)      
        # batch['surface_noisy'] = batch['surface_noisy'].squeeze(1)
         batch['state_surface'] = torch.cat([batch['state_surface'], 
                                    batch['surface_noisy'],batch['state_constant']], dim=1)
-        print(batch['state_surface'].shape, 'concatenated')
+  #      print(batch['state_surface'].shape, 'concatenated')
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
         month_emb = self.month_embedder(month)
         timestep_emb = self.timestep_embedder(timesteps)
+     #   print(batch['forcings'].shape,'first')
         ch4_emb = self.timestep_embedder(batch['forcings'][:,0])
         cfc11_emb = self.timestep_embedder(batch['forcings'][:,1])
         cfc12_emb = self.timestep_embedder(batch['forcings'][:,2])
@@ -68,7 +80,7 @@ class SimpleDiffusion(pl.LightningModule):
         cond_emb = (month_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb)
         
         out = self.backbone(batch, cond_emb)
-        print(out['next_state_surface'].shape,'out')
+    #    print(out['next_state_surface'].shape,'out')
         return out
 
     def training_step(self, batch, batch_nb):
@@ -108,8 +120,8 @@ class SimpleDiffusion(pl.LightningModule):
             lat_coeffs = self.dataset.lat_coeffs_equi
     # surface_coeffs = pangu_surface_coeffs
         device = batch['next_state_level'].device
-        print(pred['next_state_surface'].squeeze().shape)
-        print(batch['next_state_surface'].squeeze().shape)
+      #  print(pred['next_state_surface'].squeeze().shape)
+      #  print(batch['next_state_surface'].squeeze().shape)
     #    print(pred['next_state_surface'][0,0,100])
    #     print(batch['next_state_surface'][0,0,0,100])
         mse_surface = (pred['next_state_surface'].squeeze() - batch['next_state_surface'].squeeze()).pow(2)
@@ -135,21 +147,43 @@ class SimpleDiffusion(pl.LightningModule):
         loss = mse_surface.sum(1).mean((-3, -2, -1))
         return mse_surface, None, loss
 
-    def sample_rollout(self, batch, *args, lead_time_days=1, **kwargs):
+    def sample_rollout(self, batch, *args, lead_time_months=12, **kwargs):
         history = dict(state_surface=[],state_level=[])
-        local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
-        for i in range(lead_time_days):
-            denorm_sample = self.sample(local_batch, *args, **kwargs)
-            history['state_surface'].append(denorm_sample['next_state_surface'])
-            history['state_level'].append(denorm_sample['next_state_level'])
-            # make new batch starting from denorm_sample
-            local_batch = dict(state_surface=denorm_sample['next_state_surface'],
-                               state_level=denorm_sample['next_state_level'],
-                               time=batch['next_time'])
-            # TODO: pb: this needs the base inference model !!
+        next_time = batch['next_time']    
+       # print(next_time)
+        get_year_index = np.vectorize(lambda x: int(x.split('-')[0]) - 1960)
 
+        cur_year_index = torch.Tensor(get_year_index(next_time))
+        cur_year_index = int(next_time[0].split('-')[0]) - 1960
+        #print(cur_year_index)
+        #print(self.dataset.atmos_forcings[:,cur_year_index].shape)
+       #print(self.dataset.atmos_forcings.shape)
+        inc_time_vec = np.vectorize(inc_time)
+     #   local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
+        local_batch = batch
+        for i in range(lead_time_months):
+            denorm_sample = self.sample(local_batch, denormalize=False,num_inference_steps=2)
+            history['state_surface'].append(denorm_sample['next_state_surface'])
+           # history['state_level'].append(denorm_sample['next_state_level'])
+            # make new batch starting from denorm_sample
+            # print(denorm_sample['next_state_surface'].shape)
+            # print(local_batch['state_surface'].shape)
+            # print(self.dataset.surface_delta_stds.shape)
+            state_surface=denorm_sample['next_state_surface']*np.expand_dims(self.dataset.surface_delta_stds,0) + local_batch['state_surface'],
+            # print(state_surface[0].shape)
+           # print(cur_year_index)
+           # print(self.dataset.atmos_forcings.shape)
+           # print(self.dataset.atmos_forcings[:,cur_year_index].shape)
+            local_batch = dict(state_surface=state_surface[0],
+                               #state_level=denorm_sample['next_state_level'],
+                               time=next_time,
+                               state_constant=local_batch['state_constant'],
+                                 forcings=torch.Tensor(self.dataset.atmos_forcings[:,cur_year_index]).unsqueeze(0), #I have no idea why i need to unsqueeze here does lightning add a dimenions with the batch? who knows
+                                 state_depth=torch.empty(0),
+                               next_time=inc_time_vec(next_time))
+       #     print(local_batch['forcings'].shape)
         # it should return the history of generated states !
-        return None
+        return history
         
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), 
@@ -167,7 +201,7 @@ class SimpleDiffusion(pl.LightningModule):
 
     def sample(self, batch, 
                 scheduler='ddpm',
-                num_inference_steps=50,
+                num_inference_steps=100,
                 seed=0,
                 denormalize=True,
                 cf_guidance=None,
@@ -204,15 +238,15 @@ class SimpleDiffusion(pl.LightningModule):
                 steps.append(local_batch['surface_noisy'])
                 # print(local_batch['state_surface'].shape,'local batch')
                 # a hack to readjust what is modified in the forward loop
-                local_batch['state_surface'] = local_batch['state_surface'][:,:,:9]
+                local_batch['state_surface'] = local_batch['state_surface'][:,:9]
             sample = dict(next_state_surface=local_batch['surface_noisy'])
             
         denorm_sample = sample
-        if denormalize:
-            denorm_sample = self.dataset.denormalize(sample, batch)
+       # if denormalize:
+       #     denorm_sample = self.dataset.denormalize(sample, batch)
 
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
-        return denorm_sample,steps
+        return sample,batch,steps
 
     def validation_step(self, batch, batch_nb):
             # for the validation, we make some generations and log them 
@@ -223,8 +257,7 @@ class SimpleDiffusion(pl.LightningModule):
                                 for j in range(self.num_members)]
             
             # denorm_samples = [self.dataset.denormalize(s, batch) for s in samples]
-            print(samples)
-            denorm_batch = samples[1][0]
+            denorm_batch = samples[0][1]
             denorm_samples = [x[0] for x in samples]
 
             #denorm_sample1, denorm_batch = self.dataset.denormalize(sample1, batch)
@@ -291,7 +324,7 @@ class SimpleDiffusion(pl.LightningModule):
 
 
     def on_validation_epoch_end(self):
-        for metric in [self.metrics, self.classifier_score]:
+        for metric in [self.metrics]:
             out = metric.compute()
             self.log_dict(out)# dont put on_epoch = True here
             print(out)

@@ -17,7 +17,7 @@ train_dataset:
   _target_: ipsl_dcpp.model.ipsl_dataset.IPSL_DCPP
   domain: train
   lead_time_months: 1
-  delta: False
+  delta: True
   normalization: 'climatology'
   generate_statistics: False
 
@@ -25,7 +25,7 @@ val_dataset:
   _target_: ipsl_dcpp.model.ipsl_dataset.IPSL_DCPP
   domain: val
   lead_time_months: 1
-  delta: False
+  delta: True
   normalization: 'climatology'
   generate_statistics: False
 
