@@ -39,8 +39,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.files = dict(
                   all_=[str(x) for x in self.files],
             #need to go to only 2004 because atmos forcings only go to 2014
-                  train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,2004))])],
-                  val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2004,2013))])],
+                  train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,2000))])],
+                  val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2000,2004))])],
                   test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2013,2016))])])[domain]
         #by ensemble member
         # self.files = dict(
@@ -53,7 +53,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.xr_options = dict(engine='netcdf4', cache=True)
         self.lead_time_months = lead_time_months
         variable_subset = [50, 87, 88, 89, 6, 25, 13, 14, 34]
-        self.land_mask = np.expand_dims(np.load(f'{self.work}/data/land_mask.npy'),axis=(0,1))
+        self.land_mask = np.expand_dims(np.load(f'{self.work}/data/land_mask.npy'),axis=(0))
        # self.surface_means = np.expand_dims(np.load(f'{self.work}/data/single_var_surface_means.npy'),axis=(0,1))
        # self.surface_stds = np.expand_dims(np.load(f'{self.work}/data/single_var_surface_stds.npy'),axis=(0,1))
      #   self.surface_means = np.broadcast_to(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/climatology_surface_means.npy'),axis=(-1,-2,-4)),(-1,-2)),(12,91,143,144))
@@ -80,7 +80,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             self.surface_stds = np.nanmean(np.load(f'{self.work}/data/spatial_multi_var_surface_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
             self.depth_means = np.load(f'{self.work}/data/spatial_depth_means.npy').squeeze()
             self.depth_stds = np.nanmean(np.load(f'{self.work}/data/spatial_depth_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
-        self.surface_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/surface_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2))[:,variable_subset]
+        self.surface_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/surface_delta_std.npy'),axis=(-1,-2)),axis=(-1,-2))[variable_subset]
         self.depth_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/depth_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2))
       #  self.plev_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/plev_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2))
         self.plev_delta_stds = np.ones([8,19,143,144])
@@ -158,6 +158,9 @@ class IPSL_DCPP(torch.utils.data.Dataset):
 
                 target_surface_variables = (target_surface_variables - self.surface_means) / self.surface_stds
                 target_depth_variables = (target_depth_variables - self.depth_means) / self.depth_stds
+            print(input_surface_variables.shape)
+            print(target_surface_variables.shape)
+            print(self.surface_delta_stds.shape,'surface_deltas')
             if(self.delta):
            # surface_mask = (self.surface_delta_stds != 0)
            # depth_mask = (self.depth_delta_stds != 0)
@@ -166,12 +169,12 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                 target_plev_variables = (target_plev_variables - input_plev_variables) / self.plev_delta_stds
                 target_surface_variables = (target_surface_variables - input_surface_variables) / self.surface_delta_stds
                 target_depth_variables = (target_depth_variables - input_depth_variables) / self.depth_delta_stds
-            input_surface_variables = np.expand_dims(np.nan_to_num(input_surface_variables,0),0)
-            input_plev_variables = np.expand_dims(np.nan_to_num(input_plev_variables,0),0)
-            input_depth_variables = np.expand_dims(np.nan_to_num(input_depth_variables,0),0)
-            target_surface_variables = np.expand_dims(np.nan_to_num(target_surface_variables,0),0)
-            target_plev_variables = np.expand_dims(np.nan_to_num(target_plev_variables,0),0)
-            target_depth_variables = np.expand_dims(np.nan_to_num(target_depth_variables,0),0)
+            input_surface_variables = torch.nan_to_num(input_surface_variables,0)
+            input_plev_variables = torch.nan_to_num(input_plev_variables,0)
+            input_depth_variables = torch.nan_to_num(input_depth_variables,0)
+            target_surface_variables = torch.nan_to_num(target_surface_variables,0)
+            target_plev_variables = torch.nan_to_num(target_plev_variables,0)
+            target_depth_variables = torch.nan_to_num(target_depth_variables,0)
         out.update(dict(
                     # state_surface=input_surface_variables.astype(np.float32),
                     # state_level=input_plev_variables.astype(np.float32),
@@ -180,18 +183,16 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                     # next_state_surface=target_surface_variables.astype(np.float32),
                     # next_state_level=target_plev_variables.astype(np.float32),
                     # next_state_depth=target_depth_variables.astype(np.float32),
-                    state_surface=input_surface_variables,
-                    state_level=input_plev_variables,
-                    state_depth=input_depth_variables,
-                    state_constant=self.land_mask,
-                    next_state_surface=target_surface_variables,
-                    next_state_level=target_plev_variables,
-                    next_state_depth=target_depth_variables,
+                    state_surface=input_surface_variables.type(torch.float32),
+                    state_level=input_plev_variables.type(torch.float32),
+                    state_depth=input_depth_variables.type(torch.float32),
+                    state_constant=self.land_mask.astype(np.float32),
+                    next_state_surface=target_surface_variables.type(torch.float32),
+                    next_state_level=target_plev_variables.type(torch.float32),
+                    next_state_depth=target_depth_variables.type(torch.float32),
                     time=time,
                     next_time=next_time,
-                    forcings=cur_year_forcings
-                ))
-
+                    forcings=cur_year_forcings.astype(np.float32)))
 
         return out
 
@@ -219,16 +220,16 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             
         if(pred != None):
             pred = dict(#next_state_level=denorm_level(pred['next_state_level']),
-                        next_state_surface=torch.where(self.var_mask,denorm_surface(pred['next_state_surface'],next_month),torch.nan),
+                        next_state_surface=torch.where(self.var_mask.to(device),denorm_surface(pred['next_state_surface'],next_month),torch.nan),
                #         next_state_depth=denorm_depth(pred['next_state_depth'],next_month),
             )
 
         batch = dict(#next_state_level=denorm_level(batch['next_state_level']),
-                    next_state_surface=torch.where(self.var_mask,denorm_surface(batch['next_state_surface'],next_month),torch.nan),
+                    next_state_surface=torch.where(self.var_mask.to(device),denorm_surface(batch['next_state_surface'],next_month),torch.nan),
            #          next_state_depth=denorm_depth(batch['next_state_depth'],next_month),
             #          state_depth=denorm_depth(batch['state_depth'],next_month),
                     state_constant=batch['state_constant'],
-                    state_surface=torch.where(self.var_mask==1,denorm_surface(batch['state_surface'],cur_month),torch.nan),
+                    state_surface=torch.where(self.var_mask.to(device)==1,denorm_surface(batch['state_surface'],cur_month),torch.nan),
                     time=batch['time'],
         next_time=batch['next_time'])
 

@@ -181,12 +181,12 @@ class PanguWeather(nn.Module):
             surface_mask (torch.Tensor): 2D 
             upper_air (torch.Tensor): 3D 
         """
-        surface = batch['state_surface'].squeeze(-4)
+        surface = batch['state_surface']
         if(self.plev):
             upper_air = batch['state_level'].squeeze(-5)
         if(self.soil):
             depth = batch['state_depth'].squeeze(-5)
-        constants = batch['state_constant'].squeeze(-4)
+        #constants = batch['state_constant'].squeeze(-4)
         #forcings = batch['forcings']
        # dt = np.vectorize(datetime.datetime.strptime)(batch['time'],'%Y-%m')
        # time_step_conversion = np.vectorize(lambda x: x.month)
@@ -203,7 +203,6 @@ class PanguWeather(nn.Module):
         if(self.plev):
             upper_air = self.plev_patchembed3d(upper_air)
             x = torch.concat([x,upper_air], dim=2)
-        
         B, C, Pl, Lat, Lon = x.shape
         x = x.reshape(B, C, -1).transpose(1, 2)
         x = self.layer1(x,c)

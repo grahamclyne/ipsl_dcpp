@@ -3,6 +3,8 @@ import lightning.pytorch as pl
 import diffusers
 import torch
 from ipsl_dcpp.model.pangu import TimestepEmbedder
+from ipsl_dcpp.evaluation.metrics import EnsembleMetrics
+
 
 class SimpleDiffusion(pl.LightningModule):
     def __init__(
@@ -24,6 +26,10 @@ class SimpleDiffusion(pl.LightningModule):
         self.num_diffusion_timesteps = num_diffusion_timesteps
         self.backbone = backbone # necessary to put it on device
         self.dataset = dataset
+        self.metrics = EnsembleMetrics(dataset=dataset)
+        self.num_inference_steps = 5
+
+        self.num_members = 2
         self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_diffusion_timesteps,
                                                        beta_schedule='squaredcos_cap_v2',
                                                        beta_start=0.0001,
@@ -40,16 +46,17 @@ class SimpleDiffusion(pl.LightningModule):
             self.log(mode+k, v, prog_bar=True,sync_dist=True)
 
     def forward(self, batch, timesteps, sel=1):
+
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
       #  print(sel.shape)
-        # print(batch['surface_noisy'].shape)
-        # print(batch['state_surface'].shape)
-        # print(batch['forcings'].shape)      
-        # print(batch['state_constant'].shape)      
-
+        print(batch['surface_noisy'].shape)
+        print(batch['state_surface'].shape)
+        print(batch['state_constant'].shape)      
+       # batch['surface_noisy'] = batch['surface_noisy'].squeeze(1)
         batch['state_surface'] = torch.cat([batch['state_surface'], 
-                                   batch['surface_noisy'].squeeze(1),batch['state_constant']], dim=2)
+                                   batch['surface_noisy'],batch['state_constant']], dim=1)
+        print(batch['state_surface'].shape, 'concatenated')
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
         month_emb = self.month_embedder(month)
         timestep_emb = self.timestep_embedder(timesteps)
@@ -58,8 +65,10 @@ class SimpleDiffusion(pl.LightningModule):
         cfc12_emb = self.timestep_embedder(batch['forcings'][:,2])
         c02_emb = self.timestep_embedder(batch['forcings'][:,3])
 
-        cond_emb = month_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb
+        cond_emb = (month_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb)
+        
         out = self.backbone(batch, cond_emb)
+        print(out['next_state_surface'].shape,'out')
         return out
 
     def training_step(self, batch, batch_nb):
@@ -71,7 +80,6 @@ class SimpleDiffusion(pl.LightningModule):
 
         surface_noise = torch.randn_like(batch['next_state_surface'])
         #level_noise = torch.randn_like(batch['next_state_level'])
-
         batch['surface_noisy'] = self.noise_scheduler.add_noise(batch['next_state_surface'], surface_noise, timesteps)
         #batch['level_noisy'] = self.noise_scheduler.add_noise(batch['next_state_level'], level_noise, timesteps)
 
@@ -100,11 +108,11 @@ class SimpleDiffusion(pl.LightningModule):
             lat_coeffs = self.dataset.lat_coeffs_equi
     # surface_coeffs = pangu_surface_coeffs
         device = batch['next_state_level'].device
-        # print(pred['next_state_surface'].shape)
-        # print(batch['next_state_surface'].shape)
+        print(pred['next_state_surface'].squeeze().shape)
+        print(batch['next_state_surface'].squeeze().shape)
     #    print(pred['next_state_surface'][0,0,100])
    #     print(batch['next_state_surface'][0,0,0,100])
-        mse_surface = (pred['next_state_surface'] - batch['next_state_surface'].squeeze(1)).pow(2)
+        mse_surface = (pred['next_state_surface'].squeeze() - batch['next_state_surface'].squeeze()).pow(2)
 
         mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
     #   mse_surface_w = mse_surface.mul(surface_coeffs.to(device))
@@ -126,7 +134,23 @@ class SimpleDiffusion(pl.LightningModule):
     #           mse_level_w.sum(1).mean((-3, -2, -1)))/nvar
         loss = mse_surface.sum(1).mean((-3, -2, -1))
         return mse_surface, None, loss
-            
+
+    def sample_rollout(self, batch, *args, lead_time_days=1, **kwargs):
+        history = dict(state_surface=[],state_level=[])
+        local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
+        for i in range(lead_time_days):
+            denorm_sample = self.sample(local_batch, *args, **kwargs)
+            history['state_surface'].append(denorm_sample['next_state_surface'])
+            history['state_level'].append(denorm_sample['next_state_level'])
+            # make new batch starting from denorm_sample
+            local_batch = dict(state_surface=denorm_sample['next_state_surface'],
+                               state_level=denorm_sample['next_state_level'],
+                               time=batch['next_time'])
+            # TODO: pb: this needs the base inference model !!
+
+        # it should return the history of generated states !
+        return None
+        
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), 
                                 lr=self.lr, betas=self.betas, 
@@ -152,17 +176,7 @@ class SimpleDiffusion(pl.LightningModule):
             cf_guidance = 1
         if scheduler == 'ddpm':
             scheduler = self.noise_scheduler
-        # elif scheduler == 'ddim':
-        #     from diffusers import DDIMScheduler
-        #     sched_cfg = self.noise_scheduler.config
-        #     scheduler = DDIMScheduler(num_train_timesteps=sched_cfg.num_train_timesteps,
-        #                                                 beta_schedule=sched_cfg.beta_schedule,
-        #                                                 prediction_type=sched_cfg.prediction_type,
-        #                                                 beta_start=sched_cfg.beta_start,
-        #                                                 beta_end=sched_cfg.beta_end,
-        #                                                 clip_sample=False,
-        #                                                 clip_sample_range=1e6)
-            
+
         scheduler.set_timesteps(num_inference_steps)
 
         local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
@@ -170,16 +184,14 @@ class SimpleDiffusion(pl.LightningModule):
         generator.manual_seed(seed)
 
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
-        level_noise = torch.randn(local_batch['state_level'].size(), generator=generator)
 
         local_batch['surface_noisy'] = surface_noise.to(self.device)
-        local_batch['level_noisy'] = level_noise.to(self.device)
         steps = []
         with torch.no_grad():
             for t in scheduler.timesteps:
+                print(t)
                 # 1. predict noise model_output
-                pred = self.forward(local_batch, torch.tensor([t]).to(self.device), (1 if cf_guidance > 0 else 0))
-                steps.append(pred['next_state_surface'][0,90])
+                pred = self.forward(local_batch, torch.tensor([t]).to(self.device))
                 # if cf_guidance > 1:
                 #     uncond_pred = self.forward(local_batch, torch.tensor([t]).to(self.device), 0)
                 #     # compute epsilon from uncond_pred 
@@ -189,11 +201,10 @@ class SimpleDiffusion(pl.LightningModule):
                 local_batch['surface_noisy'] = scheduler.step(pred['next_state_surface'], t, 
                                                             local_batch['surface_noisy'], 
                                                             generator=generator).prev_sample
-
-                # local_batch['level_noisy'] = scheduler.step(pred['next_state_level'], t, 
-                #                                             local_batch['level_noisy'], 
-                #                                             generator=generator).prev_sample
-                
+                steps.append(local_batch['surface_noisy'])
+                # print(local_batch['state_surface'].shape,'local batch')
+                # a hack to readjust what is modified in the forward loop
+                local_batch['state_surface'] = local_batch['state_surface'][:,:,:9]
             sample = dict(next_state_surface=local_batch['surface_noisy'])
             
         denorm_sample = sample
@@ -202,3 +213,89 @@ class SimpleDiffusion(pl.LightningModule):
 
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
         return denorm_sample,steps
+
+    def validation_step(self, batch, batch_nb):
+            # for the validation, we make some generations and log them 
+            samples = [self.sample(batch, num_inference_steps=self.num_inference_steps, 
+                                    denormalize=True, 
+                                    scheduler='ddpm', 
+                                    seed = j)
+                                for j in range(self.num_members)]
+            
+            # denorm_samples = [self.dataset.denormalize(s, batch) for s in samples]
+            print(samples)
+            denorm_batch = samples[1][0]
+            denorm_samples = [x[0] for x in samples]
+
+            #denorm_sample1, denorm_batch = self.dataset.denormalize(sample1, batch)
+            #denorm_sample2, _ = self.dataset.denormalize(sample2, batch)
+
+            self.metrics.update(denorm_batch, denorm_samples)
+          #  self.classifier_score.update(denorm_batch, denorm_samples)
+            # avg = dict(next_state_level=(sample1['next_state_level']+sample2['next_state_level'])/2,
+            #             next_state_surface = (sample1['next_state_surface']+sample2['next_state_surface'])/2)
+            
+            # err_level = mse(batch['next_state_level'] - avg['next_state_level']).mean(0)
+            # err_surface = mse(batch['next_state_surface'] - avg['next_state_surface']).mean(0)
+            
+            # var_level = mse(torch.cat([sample1['next_state_level'],
+            #                        sample2['next_state_level']], 0).var(0).sqrt()).mean(0)
+            # var_surface = mse(torch.cat([sample1['next_state_surface'],
+            #                           sample2['next_state_surface']], 0).var(0).sqrt()).mean(0)
+
+            # n_members = sample1['next_state_surface'].shape[0] + sample2['next_state_surface'].shape[0]
+
+            # skr_level = (1 + 1/n_members)**.5 * var_level.sqrt()/err_level.sqrt()
+            # skr_surface = (1 + 1/n_members)**.5 * var_surface.sqrt()/err_surface.sqrt()
+
+            # # also check cross-seed variance ?
+            # avg_seed = dict(next_state_level=(sample1['next_state_level'][0]+sample1['next_state_level'][1])/2,
+            #             next_state_surface = (sample1['next_state_surface'][0]+sample1['next_state_surface'][1])/2)
+
+            # csvar_level = mse(torch.stack([sample1['next_state_level'][0],
+            #                             sample2['next_state_level'][0]]).var(0).sqrt())[0]
+            # csvar_surface = mse(torch.stack([sample1['next_state_surface'][0],
+            #                                 sample2['next_state_surface'][0]]).var(0).sqrt())[0]
+            # n_members = 2
+            # csr_level = (1 + 1/n_members)**.5 * csvar_level.sqrt()/err_level.sqrt()
+            # csr_surface = (1 + 1/n_members)**.5 * csvar_surface.sqrt()/err_surface.sqrt()
+                        
+            # self.mylog(skr_z500=skr_level[0, 7])
+            # self.mylog(skr_t2m=skr_surface[2, 0])
+
+            # self.mylog(csr_z500=csr_level[0, 7])
+            # self.mylog(csr_t2m=csr_surface[2, 0])
+            # sample1, sample2 = samples[:2]
+            # if hasattr(self.logger, 'log_image'):
+            #     for i in range(batch['next_state_surface'].shape[0]):
+            #         t2m_images = [batch['next_state_surface'][i, 2, 0], sample1['next_state_surface'][i, 2, 0], sample2['next_state_surface'][i, 2, 0]]
+            #         z500_images = [batch['next_state_level'][i, 0, 7], sample1['next_state_level'][i, 0, 7], sample2['next_state_level'][i, 0, 7]]
+            #         m_t2m = min([x.min() for x in t2m_images])
+            #         M_t2m = max([x.max() for x in t2m_images])
+            #         M_t2m = max([M_t2m, -m_t2m])
+            #         m_z500 = min([x.min() for x in z500_images])
+            #         M_z500 = max([x.max() for x in z500_images])
+            #         M_z500 = max([M_z500, -m_z500])
+
+            #         t2m_images = [bw_to_bwr(x, m=-M_t2m, M=M_t2m) for x in t2m_images]
+            #         z500_images = [bw_to_bwr(x, m=-M_z500, M=M_z500) for x in z500_images]
+
+            #         self.logger.log_image(key='t2m samples', images=t2m_images, caption = ['gt '+batch['time'][i], 'sample1', 'sample2'], step=self.global_step)
+            #         self.logger.log_image(key='z500 samples', images=z500_images, caption = ['gt '+batch['time'][i], 'sample1', 'sample2'], step=self.global_step)
+
+            #         # lets only log once for now
+            #         break
+
+            return None
+            #return self.training_step(batch, batch_nb)
+
+
+    def on_validation_epoch_end(self):
+        for metric in [self.metrics, self.classifier_score]:
+            out = metric.compute()
+            self.log_dict(out)# dont put on_epoch = True here
+            print(out)
+            metric.reset()
+
+    def test_step(self, batch, batch_nb):
+        return self.validation_step(batch, batch_nb)
