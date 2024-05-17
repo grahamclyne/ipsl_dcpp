@@ -23,7 +23,7 @@ class EnsembleMetrics(Metric):
     - spread skill ratio (bias-free formula with residual)
     - CRPS
     '''
-    def __init__(self, dataset, level_shape=(5, 13), surface_shape=(4, 9)):
+    def __init__(self, dataset, level_shape=(5, 13), surface_shape=(1,9)):
         # remember to call super
         super().__init__()
         # call `self.add_state`for every internal state that is needed for the metrics computations
@@ -51,11 +51,11 @@ class EnsembleMetrics(Metric):
 
         self.add_state("lat_coeffs", default=dataset.lat_coeffs_equi)
 
-        #self.lat_coeffs = 
-
-        self.display_surface_metrics = [('T2m', 2, 0),
-                                ('U10', 0, 0),
-                                ('SP', 3, 0)]
+        self.display_surface_metrics = [('tas', 0, 0),
+                                ('gpp', 0, 3),
+                                ('cVeg', 0, 4),
+                                ('evspsbl',0,5),
+                                ('ps',0,8)]
 
         # self.display_level_metrics = [('Z500', 0, 7),
         #                       ('Q700', 4, 9),
@@ -68,29 +68,32 @@ class EnsembleMetrics(Metric):
         return (x - y).abs().mul(self.lat_coeffs).nanmean((-2, -1))
 
     def wvar(self, x, dim=1): # weighted variance along axis
-        return x.var(dim).mul(self.lat_coeffs).nanmean((-2, -1))
+        #variance of the predicted ensemble
+        return x.var(dim,keepdims=True).mul(self.lat_coeffs).nanmean((-2, -1))
     
     def update(self, batch, preds) -> None:
         # inputs to this function should be denormalized
         if isinstance(preds, list):
             preds = {k:torch.stack([x[k] for x in preds], dim=1) for k in preds[0].keys()}
-
+        # print(self.lat_coeffs.shape,'lat coeffs shape')
+        # print(preds['next_state_surface'].shape,'preds shape')
         self.nsamples += batch['next_state_surface'].shape[0]
         self.nmembers += preds['next_state_surface'].shape[0] * preds['next_state_surface'].shape[1] # total member predictions
-        print(self.nmembers)
-        print(self.nsamples)
-        print(batch['next_state_surface'].shape)
-        print(preds['next_state_surface'].shape)
-        avg_preds = {k:v.mean(1) for k, v in preds.items()}
-        print(avg_preds['next_state_surface'].shape)
+        pred_ensemble_means = {k:v.mean(1) for k, v in preds.items()}
+        # print(pred_ensemble_means['next_state_surface'].shape,'pred ensemble shape')
       #  self.err_level += self.wmse(batch['next_state_level'] - avg_preds['next_state_level']).sum(0) # 2 dimensions remaining
-        self.err_surface += self.wmse(batch['next_state_surface'] - avg_preds['next_state_surface']).nansum(0)
+        self.err_surface += self.wmse((batch['next_state_surface'] - pred_ensemble_means['next_state_surface']).unsqueeze(1)).sum(0)
+        # print(batch['next_state_surface'][0,0,100])
+        # print(pred_ensemble_means['next_state_surface'][0,0,100])
+        # print(preds['next_state_surface'][0,0,0,100])
+        # print(self.wvar(preds['next_state_surface']).shape)
+        # print(self.wvar(preds['next_state_surface']))
         self.var_surface += self.wvar(preds['next_state_surface']).sum(0)
       #  self.var_level += self.wvar(preds['next_state_level']).sum(0)
 
         # log norm for unbiased sskill ratio estimation
      #   self.norm_level += self.wmse(preds['next_state_level'] - batch['pred_state_level'].unsqueeze(1)).mean(1).sum(0) # average over nmembers
-        self.norm_surface += self.wmse(preds['next_state_surface'] - batch['next_state_surface'].unsqueeze(1)).nanmean(1).sum(0) # average over nmembers
+       # self.norm_surface += self.wmse(preds['next_state_surface'] - batch['next_state_surface'].unsqueeze(1)).mean(1).sum(0) # average over nmembers
 
         # in the unbiased estimation, the err is given by next - pred
   #      self.prederr_level += self.wmse(batch['next_state_level'] - batch['pred_state_level']).sum(0)
@@ -114,15 +117,18 @@ class EnsembleMetrics(Metric):
             err = self.err_surface / self.nsamples,
             var = self.var_surface / self.nsamples,
 
-            norm = self.norm_surface/self.nsamples,
+         #   norm = self.norm_surface/self.nsamples,
             
             spskr = spskr_coeff * (self.var_surface / self.err_surface).sqrt(),
 
-            unbiased_spskr = (self.norm_surface / self.prederr_surface).sqrt(),
+         #   unbiased_spskr = (self.norm_surface / self.prederr_surface).sqrt(),
             
             crps = (self.mae_surface - .5*self.disp_surface)/self.nsamples,
             )
-        
+
+        # print(surface_metrics['err'])
+        # print(surface_metrics['var'])
+        # print(surface_metrics['norm'])
         # level_metrics = dict(
         #     err = self.err_level / self.nsamples,
         #     var = self.var_level / self.nsamples,
@@ -144,8 +150,8 @@ class EnsembleMetrics(Metric):
         # for name, i, j in self.display_level_metrics:
         #     out.update({name+'_'+k: v[i, j] for k, v in level_metrics.items()})
 
-        out['headline_unbiased_spskr'] = torch.stack([v for k, v in out.items() if 'unbiased_spskr' in k]).mean()
-        out['headline_spskr'] = torch.stack([v for k, v in out.items() if 'spskr' in k and not 'unbiased' in k]).mean()
-
+       # out['headline_unbiased_spskr'] = torch.stack([v for k, v in out.items() if 'unbiased_spskr' in k]).mean()
+       # out['headline_spskr'] = torch.stack([v for k, v in out.items() if 'spskr' in k and not 'unbiased' in k]).mean()
+        print(out.keys())
 
         return out

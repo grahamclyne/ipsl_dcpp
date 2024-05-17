@@ -80,12 +80,14 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             self.surface_stds = np.nanmean(np.load(f'{self.work}/data/spatial_multi_var_surface_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
             self.depth_means = np.load(f'{self.work}/data/spatial_depth_means.npy').squeeze()
             self.depth_stds = np.nanmean(np.load(f'{self.work}/data/spatial_depth_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
-        self.surface_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/surface_delta_std.npy'),axis=(-1,-2)),axis=(-1,-2))[variable_subset]
-        self.depth_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/depth_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2))
+        self.surface_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/surface_delta_std.npy'),axis=(-1,-2)),axis=(-1,-2))[variable_subset])
+        self.depth_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/depth_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2)))
       #  self.plev_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/plev_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2))
         self.plev_delta_stds = np.ones([8,19,143,144])
         self.atmos_forcings = np.load(f'{self.work}/data/atmos_forcings.npy')
+        self.solar_forcings = np.load(f'{self.work}/data/solar_forcings.npy')
         self.atmos_forcings = (self.atmos_forcings - self.atmos_forcings.mean(axis=1,keepdims=True)) / self.atmos_forcings.std(axis=1,keepdims=True)
+        self.solar_forcings = (self.solar_forcings - self.solar_forcings.mean(axis=(0,1),keepdims=True)) / self.solar_forcings.std(axis=(0,1),keepdims=True)
         #self.plev_means = np.expand_dims(np.load(f'{self.work}/ipsl_dcpp/data/plev_means.npy'),axis=(1,2,3))
         #self.plev_stds = np.expand_dims(np.load(f'{self.work}/ipsl_dcpp/data/plev_stds.npy'),axis=(1,2,3))
         self.plev_means = np.zeros([8,19,143,144])
@@ -140,6 +142,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         next_year_index = int(next_time.split('-')[0]) - 1960
        # cur_year_forcings = np.broadcast_to(np.expand_dims(self.atmos_forcings[:,cur_year_index],(1,2)),(4,143,144)).astype(np.float32)
         cur_year_forcings = torch.Tensor(self.atmos_forcings[:,cur_year_index])
+        cur_solar_forcings = torch.Tensor(self.solar_forcings[cur_year_index,cur_month_index])
        # cur_year_forcings = []
       #  cur_year_forcings = []
         if(not self.generate_statistics):
@@ -190,7 +193,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                     next_state_depth=target_depth_variables.type(torch.float32),
                     time=time,
                     next_time=next_time,
-                    forcings=cur_year_forcings.type(torch.float32)))
+                    forcings=cur_year_forcings.type(torch.float32),
+                    solar_forcings=cur_solar_forcings.type(torch.float32)))
         return out
 
     
@@ -201,8 +205,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         next_month = int(batch['next_time'][0].split('-')[-1]) - 1    
         #   denorm_level = lambda x: x.to(device)*torch.from_numpy(self.plev_stds).to(device) + torch.from_numpy(self.plev_means).to(device)
         if(self.delta):
-            batch_actual['next_state_surface'] = (batch['next_state_surface']*np.expand_dims(dataloader.dataset.surface_delta_stds,0)) + batch['state_surface']
-            pred['next_state_surface'] = (pred['next_state_surface']*np.expand_dims(dataloader.dataset.surface_delta_stds,0)) + batch['state_surface']
+            batch['next_state_surface'] = ((batch['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
+            pred['next_state_surface'] = ((pred['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
 
     #        if(pred != None):
     #            pred['next_state_surface'] = pred['next_state_surface']*self.surface_delta_stds + batch['state_surface']

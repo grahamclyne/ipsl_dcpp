@@ -40,7 +40,7 @@ class SimpleDiffusion(pl.LightningModule):
         self.metrics = EnsembleMetrics(dataset=dataset)
         self.num_inference_steps = 50
 
-        self.num_members = 2
+        self.num_members = 6
         self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_diffusion_timesteps,
                                                        beta_schedule='squaredcos_cap_v2',
                                                        beta_start=0.0001,
@@ -78,7 +78,8 @@ class SimpleDiffusion(pl.LightningModule):
         c02_emb = self.timestep_embedder(batch['forcings'][:,3])
 
         cond_emb = (month_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb)
-        
+        for wavelength_index in range(len(batch['solar_forcings'][0])):
+            cond_emb += self.timestep_embedder(batch['solar_forcings'][:,wavelength_index]) 
         out = self.backbone(batch, cond_emb)
     #    print(out['next_state_surface'].shape,'out')
         return out
@@ -200,8 +201,8 @@ class SimpleDiffusion(pl.LightningModule):
         return [opt], [sched]
 
     def sample(self, batch, 
-                scheduler='ddpm',
-                num_inference_steps=100,
+                scheduler,
+                num_inference_steps,
                 seed=0,
                 denormalize=True,
                 cf_guidance=None,
@@ -223,7 +224,7 @@ class SimpleDiffusion(pl.LightningModule):
         steps = []
         with torch.no_grad():
             for t in scheduler.timesteps:
-                print(t)
+                # print(t)
                 # 1. predict noise model_output
                 pred = self.forward(local_batch, torch.tensor([t]).to(self.device))
                 # if cf_guidance > 1:
@@ -241,9 +242,8 @@ class SimpleDiffusion(pl.LightningModule):
                 local_batch['state_surface'] = local_batch['state_surface'][:,:9]
             sample = dict(next_state_surface=local_batch['surface_noisy'])
             
-        denorm_sample = sample
-       # if denormalize:
-       #     denorm_sample = self.dataset.denormalize(sample, batch)
+        if denormalize:
+            sample,batch = self.dataset.denormalize(sample, batch)
 
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
         return sample,batch,steps
