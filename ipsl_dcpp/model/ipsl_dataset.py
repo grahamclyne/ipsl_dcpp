@@ -198,7 +198,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         return out
 
     
-    def denormalize(self, pred,batch):
+    def denormalize(self, batch):
         
         device = batch['next_state_surface'].device
         cur_month = int(batch['time'][0].split('-')[-1]) - 1     
@@ -206,7 +206,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         #   denorm_level = lambda x: x.to(device)*torch.from_numpy(self.plev_stds).to(device) + torch.from_numpy(self.plev_means).to(device)
         if(self.delta):
             batch['next_state_surface'] = ((batch['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
-            pred['next_state_surface'] = ((pred['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
+          #  pred['next_state_surface'] = ((pred['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
 
     #        if(pred != None):
     #            pred['next_state_surface'] = pred['next_state_surface']*self.surface_delta_stds + batch['state_surface']
@@ -222,11 +222,11 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             denorm_surface = lambda x,month_index: x.squeeze().to(device)*torch.from_numpy(self.surface_stds).to(device) + torch.from_numpy(self.surface_means).to(device)
         #    denorm_depth = lambda x,month_index: x.squeeze().to(device)*torch.from_numpy(self.depth_stds).to(device) + torch.from_numpy(self.depth_means).to(device)    
             
-        if(pred != None):
-            pred = dict(#next_state_level=denorm_level(pred['next_state_level']),
-                        next_state_surface=torch.where(self.var_mask.to(device),denorm_surface(pred['next_state_surface'],next_month),torch.nan),
-               #         next_state_depth=denorm_depth(pred['next_state_depth'],next_month),
-            )
+        # if(pred != None):
+        #     pred = dict(#next_state_level=denorm_level(pred['next_state_level']),
+        #                 next_state_surface=torch.where(self.var_mask.to(device),denorm_surface(pred['next_state_surface'],next_month),torch.nan),
+        #        #         next_state_depth=denorm_depth(pred['next_state_depth'],next_month),
+        #     )
 
         batch = dict(#next_state_level=denorm_level(batch['next_state_level']),
                     next_state_surface=torch.where(self.var_mask.to(device),denorm_surface(batch['next_state_surface'],next_month),torch.nan),
@@ -237,7 +237,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                     time=batch['time'],
         next_time=batch['next_time'])
 
-        return pred, batch
+        return batch
 
     
     

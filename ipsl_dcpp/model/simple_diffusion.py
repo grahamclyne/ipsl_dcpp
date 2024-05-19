@@ -6,6 +6,8 @@ from ipsl_dcpp.model.pangu import TimestepEmbedder
 from ipsl_dcpp.evaluation.metrics import EnsembleMetrics
 import datetime
 import numpy as np
+import os
+import psutil
 def inc_time(batch_time):
     batch_time = datetime.datetime.strptime(batch_time,'%Y-%m')
     if(batch_time.month == 12):
@@ -38,9 +40,9 @@ class SimpleDiffusion(pl.LightningModule):
         self.backbone = backbone # necessary to put it on device
         self.dataset = dataset
         self.metrics = EnsembleMetrics(dataset=dataset)
-        self.num_inference_steps = 50
+        self.num_inference_steps = 20
 
-        self.num_members = 6
+        self.num_members = 3
         self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_diffusion_timesteps,
                                                        beta_schedule='squaredcos_cap_v2',
                                                        beta_start=0.0001,
@@ -86,6 +88,7 @@ class SimpleDiffusion(pl.LightningModule):
 
     def training_step(self, batch, batch_nb):
         # sample timesteps
+        print(psutil.Process(os.getpid()).memory_info()[0]/(2.**30),'train')
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
 
@@ -148,7 +151,7 @@ class SimpleDiffusion(pl.LightningModule):
         loss = mse_surface.sum(1).mean((-3, -2, -1))
         return mse_surface, None, loss
 
-    def sample_rollout(self, batch, *args, lead_time_months=12, **kwargs):
+    def sample_rollout(self, batch, *args, lead_time_months=120, **kwargs):
         history = dict(state_surface=[],state_level=[])
         next_time = batch['next_time']    
        # print(next_time)
@@ -156,31 +159,37 @@ class SimpleDiffusion(pl.LightningModule):
 
         cur_year_index = torch.Tensor(get_year_index(next_time))
         cur_year_index = int(next_time[0].split('-')[0]) - 1960
+        cur_month_index = int(next_time[0].split('-')[-1]) - 1
+
         #print(cur_year_index)
         #print(self.dataset.atmos_forcings[:,cur_year_index].shape)
        #print(self.dataset.atmos_forcings.shape)
         inc_time_vec = np.vectorize(inc_time)
      #   local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
-        local_batch = batch
         for i in range(lead_time_months):
-            denorm_sample = self.sample(local_batch, denormalize=False,num_inference_steps=2)
-            history['state_surface'].append(denorm_sample['next_state_surface'])
+            sample,batch = self.sample(batch, denormalize=False,num_inference_steps=50,scheduler='ddpm')
+            history['state_surface'].append(sample['next_state_surface'])
            # history['state_level'].append(denorm_sample['next_state_level'])
             # make new batch starting from denorm_sample
             # print(denorm_sample['next_state_surface'].shape)
             # print(local_batch['state_surface'].shape)
             # print(self.dataset.surface_delta_stds.shape)
-            state_surface=denorm_sample['next_state_surface']*np.expand_dims(self.dataset.surface_delta_stds,0) + local_batch['state_surface'],
             # print(state_surface[0].shape)
            # print(cur_year_index)
            # print(self.dataset.atmos_forcings.shape)
            # print(self.dataset.atmos_forcings[:,cur_year_index].shape)
-            local_batch = dict(state_surface=state_surface[0],
+           
+           #only for delta runs
+            state_surface=sample['next_state_surface']*np.expand_dims(self.dataset.surface_delta_stds,0) + batch['state_surface'],
+            print(state_surface)
+            batch = dict(state_surface=state_surface[0],
                                #state_level=denorm_sample['next_state_level'],
+                               next_state_surface=batch['next_state_surface'],
                                time=next_time,
-                               state_constant=local_batch['state_constant'],
+                               state_constant=batch['state_constant'],
                                  forcings=torch.Tensor(self.dataset.atmos_forcings[:,cur_year_index]).unsqueeze(0), #I have no idea why i need to unsqueeze here does lightning add a dimenions with the batch? who knows
                                  state_depth=torch.empty(0),
+                                 solar_forcings=torch.Tensor(self.dataset.solar_forcings[cur_year_index,cur_month_index]).unsqueeze(0),
                                next_time=inc_time_vec(next_time))
        #     print(local_batch['forcings'].shape)
         # it should return the history of generated states !
@@ -221,7 +230,7 @@ class SimpleDiffusion(pl.LightningModule):
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
 
         local_batch['surface_noisy'] = surface_noise.to(self.device)
-        steps = []
+      #  steps = [] # this is the memory leak
         with torch.no_grad():
             for t in scheduler.timesteps:
                 # print(t)
@@ -236,7 +245,7 @@ class SimpleDiffusion(pl.LightningModule):
                 local_batch['surface_noisy'] = scheduler.step(pred['next_state_surface'], t, 
                                                             local_batch['surface_noisy'], 
                                                             generator=generator).prev_sample
-                steps.append(local_batch['surface_noisy'])
+               # steps.append(local_batch['surface_noisy'])
                 # print(local_batch['state_surface'].shape,'local batch')
                 # a hack to readjust what is modified in the forward loop
                 local_batch['state_surface'] = local_batch['state_surface'][:,:9]
@@ -246,7 +255,7 @@ class SimpleDiffusion(pl.LightningModule):
             sample,batch = self.dataset.denormalize(sample, batch)
 
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
-        return sample,batch,steps
+        return sample,batch
 
     def validation_step(self, batch, batch_nb):
             # for the validation, we make some generations and log them 
@@ -259,11 +268,13 @@ class SimpleDiffusion(pl.LightningModule):
             # denorm_samples = [self.dataset.denormalize(s, batch) for s in samples]
             denorm_batch = samples[0][1]
             denorm_samples = [x[0] for x in samples]
+            print(psutil.Process(os.getpid()).memory_info()[0]/(2.**30),'validation')
 
             #denorm_sample1, denorm_batch = self.dataset.denormalize(sample1, batch)
             #denorm_sample2, _ = self.dataset.denormalize(sample2, batch)
 
             self.metrics.update(denorm_batch, denorm_samples)
+            samples = None
           #  self.classifier_score.update(denorm_batch, denorm_samples)
             # avg = dict(next_state_level=(sample1['next_state_level']+sample2['next_state_level'])/2,
             #             next_state_surface = (sample1['next_state_surface']+sample2['next_state_surface'])/2)

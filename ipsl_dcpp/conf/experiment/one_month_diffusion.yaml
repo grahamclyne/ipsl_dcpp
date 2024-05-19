@@ -4,8 +4,8 @@ lead_time_months: 1
 #see http://www.idris.fr/eng/jean-zay/gpu/jean-zay-gpu-exec_partition_slurm-eng.html for gpu to cpu ratio for different partitions
 num_gpus: 1
 gpu_type: v100
-train_batch_size: 4
-val_batch_size: 4
+train_batch_size: 2
+val_batch_size: 2
 max_epochs: 100
 #qos: "qos_gpu-dev"
 qos: "qos_gpu-t4"
