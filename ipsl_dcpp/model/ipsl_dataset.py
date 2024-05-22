@@ -105,11 +105,11 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             with xr.open_dataset(f, **self.xr_options) as obs:
                 var_id = f.split('.')[0][-1]
                 file_stamps = [(fid, i, t,var_id) for (i, t) in enumerate(obs.time.to_numpy())]
-                #if doing autoregressive - don't include the last -leadtime- amount of each timeseries to avoid indexing overflow issues
+                #if doing autoregressive - don't include the last -leadtime- amount of each timeseries to avoid indexing overflow issues and 
                 if(self.lead_time_months == 0):
                     self.timestamps.extend(file_stamps)
                 else:
-                    self.timestamps.extend(file_stamps[:-(self.lead_time_months)])
+                    self.timestamps.extend(file_stamps[:-((self.lead_time_months)+1)])
                 #self.timestamps.extend(file_stamps)
         self.timestamps = sorted(self.timestamps, key=lambda x: x[-1]) # sort by timestamp
         self.id2pt = {i:(file_id, line_id) for (i, (file_id, line_id, var_id,s)) in enumerate(self.timestamps)}
@@ -126,20 +126,33 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         data_th = torch.from_numpy(data_np)
         return data_th
     
-    def preprocess(self, clim,clim_next):
+    def preprocess(self, prev_clim,clim,clim_next):
         out = dict()
+
+        prev_surface_variables = self.xarr_to_tensor(clim, list(self.surface_variables))
+       # prev_plev_variables = self.xarr_to_tensor(clim,list(self.plev_variables))
+       # prev_depth_variables = self.xarr_to_tensor(clim,list(self.depth_variables))
+        
+
         input_surface_variables = self.xarr_to_tensor(clim, list(self.surface_variables))
-        input_plev_variables = self.xarr_to_tensor(clim,list(self.plev_variables))
-        input_depth_variables = self.xarr_to_tensor(clim,list(self.depth_variables))
+       # input_plev_variables = self.xarr_to_tensor(clim,list(self.plev_variables))
+       # input_depth_variables = self.xarr_to_tensor(clim,list(self.depth_variables))
         
 
         target_surface_variables = self.xarr_to_tensor(clim_next, list(self.surface_variables))
-        target_plev_variables = self.xarr_to_tensor(clim_next,list(self.plev_variables))
-        target_depth_variables = self.xarr_to_tensor(clim_next,list(self.depth_variables))
+      #  target_plev_variables = self.xarr_to_tensor(clim_next,list(self.plev_variables))
+     #   target_depth_variables = self.xarr_to_tensor(clim_next,list(self.depth_variables))
+        prev_time = prev_clim.time.dt.strftime('%Y-%m').item()
+
         time = clim.time.dt.strftime('%Y-%m').item()
         next_time = clim_next.time.dt.strftime('%Y-%m').item()
+
+        prev_month_index = int(prev_time.split('-')[-1]) - 1        
         cur_month_index = int(time.split('-')[-1]) - 1
+
         next_month_index = int(next_time.split('-')[-1]) - 1 
+
+        prev_year_index = int(prev_time.split('-')[0]) - 1960
         cur_year_index = int(time.split('-')[0]) - 1960
         next_year_index = int(next_time.split('-')[0]) - 1960
        # cur_year_forcings = np.broadcast_to(np.expand_dims(self.atmos_forcings[:,cur_year_index],(1,2)),(4,143,144)).astype(np.float32)
@@ -149,12 +162,13 @@ class IPSL_DCPP(torch.utils.data.Dataset):
       #  cur_year_forcings = []
         if(not self.generate_statistics):
             if(self.normalization == 'climatology'):
+                prev_surface_variables = (prev_surface_variables - self.surface_means[prev_month_index]) / (self.surface_stds[prev_month_index])
                 input_surface_variables = (input_surface_variables - self.surface_means[cur_month_index]) / (self.surface_stds[cur_month_index])
-                input_depth_variables = (input_depth_variables - self.depth_means[cur_month_index]) / (self.depth_stds[cur_month_index])
+           #     input_depth_variables = (input_depth_variables - self.depth_means[cur_month_index]) / (self.depth_stds[cur_month_index])
                # input_plev_variables = (input_plev_variables - self.plev_means[cur_month_index]) / (self.plev_stds[cur_month_index])
 
                 target_surface_variables = (target_surface_variables - self.surface_means[next_month_index]) / (self.surface_stds[next_month_index])
-                target_depth_variables = (target_depth_variables - self.depth_means[next_month_index]) / (self.depth_stds[next_month_index])
+             #   target_depth_variables = (target_depth_variables - self.depth_means[next_month_index]) / (self.depth_stds[next_month_index])
                # target_plev_variables = (target_plev_variables - self.plev_means[cur_month_index]) / (self.plev_stds[cur_month_index])
 
             elif(self.normalization == 'normal' or self.normalization == 'spatial_normal'):
@@ -169,15 +183,17 @@ class IPSL_DCPP(torch.utils.data.Dataset):
            # depth_mask = (self.depth_delta_stds != 0)
                #target_surface_variables = (target_surface_variables[surface_mask] - input_surface_variables[surface_mask]) / (self.surface_delta_stds[surface_mask])
             #target_depth_variables = (target_depth_variables[depth_mask] - input_depth_variables[depth_mask]) / (self.depth_delta_stds[depth_mask])
-                target_plev_variables = (target_plev_variables - input_plev_variables) / self.plev_delta_stds
+              #  target_plev_variables = (target_plev_variables - input_plev_variables) / self.plev_delta_stds
                 target_surface_variables = (target_surface_variables - input_surface_variables) / self.surface_delta_stds
-                target_depth_variables = (target_depth_variables - input_depth_variables) / self.depth_delta_stds
+             #   target_depth_variables = (target_depth_variables - input_depth_variables) / self.depth_delta_stds
             input_surface_variables = torch.nan_to_num(input_surface_variables,0)
-            input_plev_variables = torch.nan_to_num(input_plev_variables,0)
-            input_depth_variables = torch.nan_to_num(input_depth_variables,0)
+          #  input_plev_variables = torch.nan_to_num(input_plev_variables,0)
+           # input_depth_variables = torch.nan_to_num(input_depth_variables,0)
             target_surface_variables = torch.nan_to_num(target_surface_variables,0)
-            target_plev_variables = torch.nan_to_num(target_plev_variables,0)
-            target_depth_variables = torch.nan_to_num(target_depth_variables,0)
+            prev_surface_variables = torch.nan_to_num(prev_surface_variables,0)
+
+           # target_plev_variables = torch.nan_to_num(target_plev_variables,0)
+          #  target_depth_variables = torch.nan_to_num(target_depth_variables,0)
         out.update(dict(
                     # state_surface=input_surface_variables.astype(np.float32),
                     # state_level=input_plev_variables.astype(np.float32),
@@ -186,13 +202,14 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                     # next_state_surface=target_surface_variables.astype(np.float32),
                     # next_state_level=target_plev_variables.astype(np.float32),
                     # next_state_depth=target_depth_variables.astype(np.float32),
+                    prev_state_surface=prev_surface_variables.type(torch.float32),
                     state_surface=input_surface_variables.type(torch.float32),
-                    state_level=input_plev_variables.type(torch.float32),
-                    state_depth=input_depth_variables.type(torch.float32),
+                #    state_level=input_plev_variables.type(torch.float32),
+                #    state_depth=input_depth_variables.type(torch.float32),
                     state_constant=self.land_mask.astype(np.float32),
                     next_state_surface=target_surface_variables.type(torch.float32),
-                    next_state_level=target_plev_variables.type(torch.float32),
-                    next_state_depth=target_depth_variables.type(torch.float32),
+                 #   next_state_level=target_plev_variables.type(torch.float32),
+                #    next_state_depth=target_depth_variables.type(torch.float32),
                     time=time,
                     next_time=next_time,
                     forcings=cur_year_forcings.type(torch.float32),
@@ -245,12 +262,14 @@ class IPSL_DCPP(torch.utils.data.Dataset):
     
     
     def __getitem__(self, i):
-        file_id, line_id = self.id2pt[i]
+        file_id, prev_line_id = self.id2pt[i]
+        line_id = prev_line_id + self.lead_time_months
         next_line_id = line_id + self.lead_time_months
         obs = xr.open_dataset(self.files[file_id], **self.xr_options)
+        prev_clim = obs.isel(time=prev_line_id)
         clim = obs.isel(time=line_id)
         clim_next = obs.isel(time=next_line_id)
         
-        out = self.preprocess(clim,clim_next)
+        out = self.preprocess(prev_clim,clim,clim_next)
         obs.close()
         return out

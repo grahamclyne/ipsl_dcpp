@@ -249,8 +249,10 @@ class PanguWeather(nn.Module):
             output_surface,output_depth,output_level = self.patchrecovery(output)
             out = dict(latent=latent,
                         next_state_level=output_level, 
-                       state_surface=batch['state_surface'],
-                       state_depth=batch['state_depth'],
+                    #    state_surface=batch['state_surface'],
+                    #    state_depth=batch['state_depth'],
+                        state_surface=torch.empty(0),
+                        state_depth=torch.empty(0),
                         next_state_surface=output_surface,
                         next_state_depth=output_depth)
         return out

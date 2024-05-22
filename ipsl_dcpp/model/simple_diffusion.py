@@ -67,7 +67,7 @@ class SimpleDiffusion(pl.LightningModule):
  #       print(batch['state_surface'].shape)
  #       print(batch['state_constant'].shape)      
        # batch['surface_noisy'] = batch['surface_noisy'].squeeze(1)
-        batch['state_surface'] = torch.cat([batch['state_surface'], 
+        batch['state_surface'] = torch.cat([batch['state_surface'],batch['prev_state_surface'], 
                                    batch['surface_noisy'],batch['state_constant']], dim=1)
   #      print(batch['state_surface'].shape, 'concatenated')
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
@@ -88,7 +88,6 @@ class SimpleDiffusion(pl.LightningModule):
 
     def training_step(self, batch, batch_nb):
         # sample timesteps
-        print(psutil.Process(os.getpid()).memory_info()[0]/(2.**30),'train')
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
 
@@ -123,7 +122,7 @@ class SimpleDiffusion(pl.LightningModule):
         if lat_coeffs is None:
             lat_coeffs = self.dataset.lat_coeffs_equi
     # surface_coeffs = pangu_surface_coeffs
-        device = batch['next_state_level'].device
+        device = batch['next_state_surface'].device
       #  print(pred['next_state_surface'].squeeze().shape)
       #  print(batch['next_state_surface'].squeeze().shape)
     #    print(pred['next_state_surface'][0,0,100])
