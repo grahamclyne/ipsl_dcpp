@@ -74,10 +74,12 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             self.surface_means = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/surface_means.npy'),(-2,-1)),(91,143,144))[6]
             self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/surface_stds.npy'),(-2,-1)),(91,143,144))[6]
             self.depth_means = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/depth_means.npy'),(-3,-2,-1)),(3,11,143,144))
-            self.depth_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/depth_stds.npy'),(-3,-2,-1)),(3,11,143,144))         
+            self.depth_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/depth_stds.npy'),(-3,-2,-1)),(3,11,143,144))
         elif(self.normalization == 'spatial_normal'):
-            self.surface_means = np.load(f'{self.work}/data/spatial_multi_var_surface_means.npy').squeeze()
-            self.surface_stds = np.nanmean(np.load(f'{self.work}/data/spatial_multi_var_surface_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
+            self.surface_means = np.load(f'{self.work}/data/spatial_multi_var_surface_means.npy').squeeze()[variable_subset]
+            print(self.surface_means.shape)
+            self.surface_stds = np.nanmean(np.load(f'{self.work}/data/spatial_multi_var_surface_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)[variable_subset]
+            print(self.surface_stds.shape)
             self.depth_means = np.load(f'{self.work}/data/spatial_depth_means.npy').squeeze()
             self.depth_stds = np.nanmean(np.load(f'{self.work}/data/spatial_depth_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
         self.surface_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/surface_delta_std.npy'),axis=(-1,-2)),axis=(-1,-2))[variable_subset])
@@ -95,24 +97,24 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.generate_statistics=generate_statistics
         self.timestamps = []
         self.id2pt_path = f'{self.work}/data/{domain}_id2pt.pkl'
-        if os.path.exists(self.id2pt_path):
-            with open(self.id2pt_path, 'rb') as handle:
-                self.id2pt = pickle.load(handle)
-        else:
-            for fid, f in tqdm(enumerate(self.files)):
-                with xr.open_dataset(f, **self.xr_options) as obs:
-                    var_id = f.split('.')[0][-1]
-                    file_stamps = [(fid, i, t,var_id) for (i, t) in enumerate(obs.time.to_numpy())]
-                    #if doing autoregressive - don't include the last -leadtime- amount of each timeseries to avoid indexing overflow issues
-                    if(self.lead_time_months == 0):
-                        self.timestamps.extend(file_stamps)
-                    else:
-                        self.timestamps.extend(file_stamps[:-(self.lead_time_months)])
-                    #self.timestamps.extend(file_stamps)
-            self.timestamps = sorted(self.timestamps, key=lambda x: x[-1]) # sort by timestamp
-            self.id2pt = {i:(file_id, line_id) for (i, (file_id, line_id, var_id,s)) in enumerate(self.timestamps)}
-            with open(self.id2pt_path, 'wb') as handle:
-                pickle.dump(self.id2pt,handle)
+        # if os.path.exists(self.id2pt_path):
+        #     with open(self.id2pt_path, 'rb') as handle:
+        #         self.id2pt = pickle.load(handle)
+        # else:
+        for fid, f in tqdm(enumerate(self.files)):
+            with xr.open_dataset(f, **self.xr_options) as obs:
+                var_id = f.split('.')[0][-1]
+                file_stamps = [(fid, i, t,var_id) for (i, t) in enumerate(obs.time.to_numpy())]
+                #if doing autoregressive - don't include the last -leadtime- amount of each timeseries to avoid indexing overflow issues
+                if(self.lead_time_months == 0):
+                    self.timestamps.extend(file_stamps)
+                else:
+                    self.timestamps.extend(file_stamps[:-(self.lead_time_months)])
+                #self.timestamps.extend(file_stamps)
+        self.timestamps = sorted(self.timestamps, key=lambda x: x[-1]) # sort by timestamp
+        self.id2pt = {i:(file_id, line_id) for (i, (file_id, line_id, var_id,s)) in enumerate(self.timestamps)}
+        with open(self.id2pt_path, 'wb') as handle:
+            pickle.dump(self.id2pt,handle)
                 
     def __len__(self):
         return len(self.id2pt) 

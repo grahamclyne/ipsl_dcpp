@@ -7,7 +7,8 @@ from omegaconf import OmegaConf
 import pickle
 import hydra
 import os
-
+import numpy as np
+import pandas as pd
 
 with initialize(version_base=None, config_path="../conf"):
     cfg = compose(config_name="config")
@@ -36,20 +37,30 @@ model = hydra.utils.instantiate(
     backbone=hydra.utils.instantiate(
         cfg.experiment.backbone,
     ),
-    dataset=train_dataloader.dataset
+    dataset=val_dataloader.dataset
 
 )
 
 # trainer.logged_metrics
+x = np.stack(val.timestamps)[:,2]
+indices = np.stack(val.timestamps)[np.where((pd.to_datetime(x).year == 2001) & (pd.to_datetime(x).month == 1),True,False)][:,[0,1]]
 
 scratch = os.environ['SCRATCH']
-checkpoint_path = torch.load(f'{scratch}/epoch=30.ckpt',map_location=torch.device('cpu'))
+checkpoint_path = torch.load(f'{scratch}/checkpoint_43cd5d08/epoch=30.ckpt',map_location=torch.device('cpu'))
 model.load_state_dict(checkpoint_path['state_dict'])
 # trainer.test(model, val_dataloader)
-batch = next(iter(val_dataloader))
+inv_map = {v: k for k, v in val.id2pt.items()}
 
 
-history = model.sample_rollout(batch,lead_time_months=120)
+for i in range(9):
+    print(i,'ensemble member')
+    index = inv_map[(indices[i][0],indices[i][1])]
+    batch = val.__getitem__(index)
+    batch['state_constant'] = torch.Tensor(batch['state_constant'])
+    batch['time'] = [batch['time']]
+    batch['next_time'] = [batch['next_time']]
 
-with open('history.pkl','wb') as f:
-    pickle.dump(history,f)
+    batch = {k: v.unsqueeze(0) if (k != 'time') and (k != 'next_time') else v for k, v in batch.items()}
+    output = model.sample_rollout(batch, lead_time_months=24,seed = 0)
+    with open(f'{i}_rollout_from_diff_ensemble.pkl','wb') as f:
+        pickle.dump(output,f)

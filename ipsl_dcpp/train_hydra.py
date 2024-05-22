@@ -91,7 +91,7 @@ def train(cfg,run_id):
         strategy='ddp',
         accelerator="gpu",
         #limit_train_batches=0.01 if cfg.debug else 1
-        #limit_val_batches=0.01 if cfg.debug else 1,
+        limit_val_batches=0.00
     )
 
     model = hydra.utils.instantiate(
