@@ -251,7 +251,8 @@ class PanguWeather(nn.Module):
                         next_state_level=output_level, 
                     #    state_surface=batch['state_surface'],
                     #    state_depth=batch['state_depth'],
-                        state_surface=torch.empty(0),
+                       prev_state_surface=batch['prev_state_surface'],
+                        state_surface=batch['state_surface'],
                         state_depth=torch.empty(0),
                         next_state_surface=output_surface,
                         next_state_depth=output_depth)

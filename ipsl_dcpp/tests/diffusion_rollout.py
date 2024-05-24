@@ -46,7 +46,7 @@ x = np.stack(val.timestamps)[:,2]
 indices = np.stack(val.timestamps)[np.where((pd.to_datetime(x).year == 2001) & (pd.to_datetime(x).month == 1),True,False)][:,[0,1]]
 
 scratch = os.environ['SCRATCH']
-checkpoint_path = torch.load(f'{scratch}/checkpoint_43cd5d08/epoch=30.ckpt',map_location=torch.device('cpu'))
+checkpoint_path = torch.load(f'{scratch}/checkpoint_bfb59d6d/epoch=16.ckpt',map_location=torch.device('cpu'))
 model.load_state_dict(checkpoint_path['state_dict'])
 # trainer.test(model, val_dataloader)
 inv_map = {v: k for k, v in val.id2pt.items()}
@@ -59,8 +59,8 @@ for i in range(9):
     batch['state_constant'] = torch.Tensor(batch['state_constant'])
     batch['time'] = [batch['time']]
     batch['next_time'] = [batch['next_time']]
-
+    print(batch['time'])
     batch = {k: v.unsqueeze(0) if (k != 'time') and (k != 'next_time') else v for k, v in batch.items()}
-    output = model.sample_rollout(batch, lead_time_months=24,seed = 0)
-    with open(f'{i}_rollout_from_diff_ensemble.pkl','wb') as f:
+    output = model.sample_rollout(batch, lead_time_months=120,seed = 0)
+    with open(f'{i}_rollout_from_diff_ensemble_with_t_and_prev.pkl','wb') as f:
         pickle.dump(output,f)

@@ -30,7 +30,10 @@ class SimpleDiffusion(pl.LightningModule):
         num_warmup_steps,
         num_training_steps,
         num_cycles,
-        dataset
+        dataset,
+        num_inference_steps,
+        prediction_type,
+        num_ensemble_members
     ):
         super().__init__()
         self.__dict__.update(locals())
@@ -40,14 +43,14 @@ class SimpleDiffusion(pl.LightningModule):
         self.backbone = backbone # necessary to put it on device
         self.dataset = dataset
         self.metrics = EnsembleMetrics(dataset=dataset)
-        self.num_inference_steps = 20
-
-        self.num_members = 3
+        self.num_inference_steps = num_inference_steps
+        self.scheduler = 'ddpm'
+        self.num_members = num_ensemble_members
         self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_diffusion_timesteps,
                                                        beta_schedule='squaredcos_cap_v2',
                                                        beta_start=0.0001,
                                                        beta_end=0.012,
-                                                       prediction_type='sample',
+                                                       prediction_type=prediction_type,
                                                        clip_sample=False,
                                                        clip_sample_range=1e6,
                                                        rescale_betas_zero_snr=True,
@@ -150,13 +153,13 @@ class SimpleDiffusion(pl.LightningModule):
         loss = mse_surface.sum(1).mean((-3, -2, -1))
         return mse_surface, None, loss
 
-    def sample_rollout(self, batch, *args, lead_time_months=120, **kwargs):
-        history = dict(state_surface=[],state_level=[])
+    def sample_rollout(self, batch, *args, lead_time_months, **kwargs):
+        history = dict(state_surface=[])
         next_time = batch['next_time']    
        # print(next_time)
-        get_year_index = np.vectorize(lambda x: int(x.split('-')[0]) - 1960)
+        # get_year_index = np.vectorize(lambda x: int(x.split('-')[0]) - 1960)
 
-        cur_year_index = torch.Tensor(get_year_index(next_time))
+        # cur_year_index = torch.Tensor(get_year_index(next_time))
         cur_year_index = int(next_time[0].split('-')[0]) - 1960
         cur_month_index = int(next_time[0].split('-')[-1]) - 1
 
@@ -166,7 +169,7 @@ class SimpleDiffusion(pl.LightningModule):
         inc_time_vec = np.vectorize(inc_time)
      #   local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
         for i in range(lead_time_months):
-            sample,batch = self.sample(batch, denormalize=False,num_inference_steps=50,scheduler='ddpm')
+            sample,batch = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler=self.scheduler)
             history['state_surface'].append(sample['next_state_surface'])
            # history['state_level'].append(denorm_sample['next_state_level'])
             # make new batch starting from denorm_sample
@@ -177,11 +180,13 @@ class SimpleDiffusion(pl.LightningModule):
            # print(cur_year_index)
            # print(self.dataset.atmos_forcings.shape)
            # print(self.dataset.atmos_forcings[:,cur_year_index].shape)
-           
+            print(len(sample))
+            print(sample)
            #only for delta runs
             state_surface=sample['next_state_surface']*np.expand_dims(self.dataset.surface_delta_stds,0) + batch['state_surface'],
             print(state_surface)
             batch = dict(state_surface=state_surface[0],
+                         prev_state_surface=batch['state_surface'],
                                #state_level=denorm_sample['next_state_level'],
                                next_state_surface=batch['next_state_surface'],
                                time=next_time,
