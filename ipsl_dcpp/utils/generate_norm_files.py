@@ -1,8 +1,6 @@
 import torch 
 from ipsl_dcpp.model.ipsl_dataset import IPSL_DCPP
 from hydra import compose, initialize
-from omegaconf import OmegaConf
-import hydra
 import numpy as np
 with initialize(version_base=None, config_path="../conf"):
     cfg = compose(config_name="config")

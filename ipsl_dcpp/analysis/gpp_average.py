@@ -1,14 +1,10 @@
 #generate gpp averages of test data 
 
-import os 
 from ipsl_dataset import IPSL_DCPP
 import torch
-import numpy as np
 import hydra
-from ipsl_dataset import surface_variables,plev_variables
-from hydra import compose, initialize
-import hydra
-from omegaconf import OmegaConf,DictConfig
+from ipsl_dataset import surface_variables
+from omegaconf import DictConfig
 
 
 

@@ -38,7 +38,7 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 300000
-  num_inference_steps: 50
+  num_inference_steps: 10
   prediction_type: 'sample'
   num_ensemble_members: 3
 

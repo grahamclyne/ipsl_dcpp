@@ -6,8 +6,6 @@ from ipsl_dcpp.model.pangu import TimestepEmbedder
 from ipsl_dcpp.evaluation.metrics import EnsembleMetrics
 import datetime
 import numpy as np
-import os
-import psutil
 def inc_time(batch_time):
     batch_time = datetime.datetime.strptime(batch_time,'%Y-%m')
     if(batch_time.month == 12):
@@ -124,65 +122,24 @@ class SimpleDiffusion(pl.LightningModule):
     def loss(self, pred, batch, lat_coeffs=None):
         if lat_coeffs is None:
             lat_coeffs = self.dataset.lat_coeffs_equi
-    # surface_coeffs = pangu_surface_coeffs
         device = batch['next_state_surface'].device
-      #  print(pred['next_state_surface'].squeeze().shape)
-      #  print(batch['next_state_surface'].squeeze().shape)
-    #    print(pred['next_state_surface'][0,0,100])
-   #     print(batch['next_state_surface'][0,0,0,100])
         mse_surface = (pred['next_state_surface'].squeeze() - batch['next_state_surface'].squeeze()).pow(2)
-
         mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
-    #   mse_surface_w = mse_surface.mul(surface_coeffs.to(device))
-    
-    # mse_level = (pred['next_state_level'] - batch['next_state_level']).pow(2)
-    # if mse_level.shape[-2] == 128:
-    #     mse_level = mse_level[..., 4:-4, 8:-8]
-    # mse_level = mse_level.mul(lat_coeffs.to(device))
-    # mse_level_w = mse_level.mul(level_coeffs.to(device))
-
-        #if self.selected_vars:
-        #    coeffs = 0.01*torch.ones(1, 5, 13, 1, 1).to(device)
-        #    coeffs[:, 0, 7] = 1
-        #    mse_level_w *= coeffs
-    
-    # nvar = (surface_coeffs.sum().item() + 5)
-        
-    #   loss = (mse_surface_w.sum(1).mean((-3, -2, -1)) + 
-    #           mse_level_w.sum(1).mean((-3, -2, -1)))/nvar
         loss = mse_surface.sum(1).mean((-3, -2, -1))
         return mse_surface, None, loss
 
     def sample_rollout(self, batch, *args, lead_time_months, **kwargs):
         history = dict(state_surface=[])
         next_time = batch['next_time']    
-       # print(next_time)
-        # get_year_index = np.vectorize(lambda x: int(x.split('-')[0]) - 1960)
-
-        # cur_year_index = torch.Tensor(get_year_index(next_time))
         cur_year_index = int(next_time[0].split('-')[0]) - 1960
         cur_month_index = int(next_time[0].split('-')[-1]) - 1
-
-        #print(cur_year_index)
-        #print(self.dataset.atmos_forcings[:,cur_year_index].shape)
-       #print(self.dataset.atmos_forcings.shape)
         inc_time_vec = np.vectorize(inc_time)
-     #   local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
         for i in range(lead_time_months):
             sample,batch = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler=self.scheduler)
             history['state_surface'].append(sample['next_state_surface'])
-           # history['state_level'].append(denorm_sample['next_state_level'])
-            # make new batch starting from denorm_sample
-            # print(denorm_sample['next_state_surface'].shape)
-            # print(local_batch['state_surface'].shape)
-            # print(self.dataset.surface_delta_stds.shape)
-            # print(state_surface[0].shape)
-           # print(cur_year_index)
-           # print(self.dataset.atmos_forcings.shape)
-           # print(self.dataset.atmos_forcings[:,cur_year_index].shape)
             print(len(sample))
             print(sample)
-           #only for delta runs
+            #only for delta runs
             state_surface=sample['next_state_surface']*np.expand_dims(self.dataset.surface_delta_stds,0) + batch['state_surface'],
             print(state_surface)
             batch = dict(state_surface=state_surface[0],
@@ -195,8 +152,6 @@ class SimpleDiffusion(pl.LightningModule):
                                  state_depth=torch.empty(0),
                                  solar_forcings=torch.Tensor(self.dataset.solar_forcings[cur_year_index,cur_month_index]).unsqueeze(0),
                                next_time=inc_time_vec(next_time))
-       #     print(local_batch['forcings'].shape)
-        # it should return the history of generated states !
         return history
         
     def configure_optimizers(self):
@@ -216,8 +171,9 @@ class SimpleDiffusion(pl.LightningModule):
     def sample(self, batch, 
                 scheduler,
                 num_inference_steps,
+                
+                denormalize,
                 seed=0,
-                denormalize=True,
                 cf_guidance=None,
                 ):
         if cf_guidance is None:
@@ -234,24 +190,19 @@ class SimpleDiffusion(pl.LightningModule):
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
 
         local_batch['surface_noisy'] = surface_noise.to(self.device)
-      #  steps = [] # this is the memory leak
         with torch.no_grad():
             for t in scheduler.timesteps:
-                # print(t)
-                # 1. predict noise model_output
+                print(t)
                 pred = self.forward(local_batch, torch.tensor([t]).to(self.device))
-                # if cf_guidance > 1:
-                #     uncond_pred = self.forward(local_batch, torch.tensor([t]).to(self.device), 0)
-                #     # compute epsilon from uncond_pred 
-                #     pred = dict(next_state_surface=pred['next_state_surface']*(1+cf_guidance) - uncond_pred['next_state_surface']*cf_guidance,
-                #                 next_state_level=pred['next_state_level']*(1+cf_guidance) - uncond_pred['next_state_level']*cf_guidance)
-                
                 local_batch['surface_noisy'] = scheduler.step(pred['next_state_surface'], t, 
                                                             local_batch['surface_noisy'], 
                                                             generator=generator).prev_sample
                # steps.append(local_batch['surface_noisy'])
                 # print(local_batch['state_surface'].shape,'local batch')
                 # a hack to readjust what is modified in the forward loop
+                # print(local_batch['state_surface'].shape) 
+
+                #due to the way the model is set up, the state_surface is modified in the forward loop
                 local_batch['state_surface'] = local_batch['state_surface'][:,:9]
             sample = dict(next_state_surface=local_batch['surface_noisy'])
             
@@ -272,7 +223,6 @@ class SimpleDiffusion(pl.LightningModule):
             # denorm_samples = [self.dataset.denormalize(s, batch) for s in samples]
             denorm_batch = samples[0][1]
             denorm_samples = [x[0] for x in samples]
-            print(psutil.Process(os.getpid()).memory_info()[0]/(2.**30),'validation')
 
             #denorm_sample1, denorm_batch = self.dataset.denormalize(sample1, batch)
             #denorm_sample2, _ = self.dataset.denormalize(sample2, batch)

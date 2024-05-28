@@ -1,12 +1,8 @@
-import pytorch_lightning as pl
-import torch.nn as nn
 import torch
 import diffusers
-from pathlib import Path
 from diffusers.training_utils import compute_snr
 
 from evaluation.metrics import EnsembleMetrics
-from evaluation.classifier_score import load_classifier, ClassifierScore
 
 
 from .forecast import ForecastModule, pangu_surface_coeffs, level_coeffs #, lat_coeffs_equi

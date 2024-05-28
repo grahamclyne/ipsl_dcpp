@@ -1,14 +1,11 @@
 from torch import nn 
-from ipsl_dcpp.model.attention_block import BasicLayer,CondBasicLayer
-from ipsl_dcpp.model.embedding import PatchEmbed2D,PatchEmbed3D
+from ipsl_dcpp.model.attention_block import CondBasicLayer
+from ipsl_dcpp.model.embedding import PatchEmbed2D
 import numpy as np
 import torch
 #from ipsl_dataset import surface_variables,plev_variables,depth_variables
-import lightning.pytorch as pl
 from ipsl_dcpp.model.patch_recovery import PatchRecovery2D,PatchRecovery3D,PatchRecovery3
-from timm.models.layers import trunc_normal_, DropPath
 from ipsl_dcpp.model.sampling import UpSample,DownSample
-import datetime
 import math
 #from pudb import set_trace; set_trace()
 

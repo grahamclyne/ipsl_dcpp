@@ -1,9 +1,6 @@
-import xarray as xr
 import os
 import torch
 from ipsl_dcpp.model.ipsl_dataset import IPSL_DCPP
-import hydra
-import os
 import numpy as np
 from hydra import compose, initialize
 

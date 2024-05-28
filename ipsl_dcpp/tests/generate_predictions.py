@@ -3,20 +3,9 @@ from ipsl_dcpp.model.ipsl_dataset import IPSL_DCPP
 import lightning.pytorch as pl
 import torch
 import hydra
-import numpy as np  
 from hydra import compose, initialize
-from omegaconf import OmegaConf,DictConfig
-import datetime
-import matplotlib.pyplot as plt
-import xarray as xr
-from celluloid import Camera
-import datetime
 import subprocess
-import sys
 import os
-from hydra import compose, initialize
-from omegaconf import OmegaConf
-from evaluation.visualization import rollout
 
 with initialize(version_base=None, config_path="conf"):
     cfg = compose(config_name="config",overrides=["experiment=one_month_multiple_variable_v100"])

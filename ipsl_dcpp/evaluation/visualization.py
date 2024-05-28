@@ -4,17 +4,13 @@ import lightning.pytorch as pl
 import torch
 import hydra
 import numpy as np
-from hydra import compose, initialize
-from omegaconf import OmegaConf,DictConfig
+from omegaconf import DictConfig
 import datetime
 import matplotlib.pyplot as plt
 import xarray as xr
 from celluloid import Camera
-import datetime
 import subprocess
-import sys
 import scipy.stats as stats
-import xarray as xr
 
     #this refers to the amount of energy found per unit of time - assumes to be over all of time!!
     #average power of a sinusoid is amplitude^2 / 2

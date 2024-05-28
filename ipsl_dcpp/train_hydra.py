@@ -1,10 +1,9 @@
 from omegaconf import DictConfig,OmegaConf
 import hydra
 import torch
-import wandb
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch.callbacks import ModelCheckpoint,TQDMProgressBar,ModelSummary
+from lightning.pytorch.callbacks import ModelCheckpoint,TQDMProgressBar
 import submitit
 import os
 from pathlib import Path

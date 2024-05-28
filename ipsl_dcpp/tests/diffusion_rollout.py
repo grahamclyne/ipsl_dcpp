@@ -1,9 +1,6 @@
-from ipsl_dcpp.model.ipsl_dataset import IPSL_DCPP
 import torch
 import lightning as pl
-from ipsl_dcpp.model.pangu import PanguWeather
 from hydra import compose, initialize
-from omegaconf import OmegaConf
 import pickle
 import hydra
 import os

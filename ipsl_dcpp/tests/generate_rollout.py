@@ -1,21 +1,11 @@
 # import os 
 from ipsl_dcpp.model.ipsl_dataset import IPSL_DCPP
-import lightning.pytorch as pl
 import torch
 import hydra
 import numpy as np  
 from hydra import compose, initialize
-from omegaconf import OmegaConf,DictConfig
-import datetime
-import matplotlib.pyplot as plt
-import xarray as xr
-from celluloid import Camera
-import datetime
 import subprocess
-import sys
 import os
-from hydra import compose, initialize
-from omegaconf import OmegaConf
 from evaluation.visualization import rollout
 with initialize(version_base=None, config_path="conf"):
     cfg = compose(config_name="config",overrides=["experiment=one_month_multiple_variable_v100"])
@@ -49,7 +39,7 @@ def compute_rollout(run_id,delta,normalization,rollout_length,zeroes=False):
     print(len(rollout_data[0]))
     if(normalization == 'normal' or normalization == 'spatial_normal'):
         climatology_surface_means = np.load('data/climatology_surface_means.npy')
-        climatology_surface_stds = np.broadcast_to(np.expand_dims(np.load(f'data/climatology_surface_stds.npy'),(-2,-1)),(12,91,143,144))
+        climatology_surface_stds = np.broadcast_to(np.expand_dims(np.load('data/climatology_surface_stds.npy'),(-2,-1)),(12,91,143,144))
         pred_climatology_normalized = []
         batch_climatology_normalized = []
         for i in range(rollout_length):

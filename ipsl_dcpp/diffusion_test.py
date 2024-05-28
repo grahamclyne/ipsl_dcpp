@@ -1,18 +1,9 @@
-from dataclasses import dataclass
-import torchvision
-import torchvision.transforms as TF
-import torchvision.datasets as datasets
-from torch.utils.data import Dataset, DataLoader
 import os
 import torch
-from tqdm import tqdm
-from ipsl_dcpp.model.pangu import PanguWeather
 from hydra import compose, initialize
-from omegaconf import OmegaConf
 import lightning as pl
 
 import hydra
-import os
 
 def get(element: torch.Tensor, t: torch.Tensor):
     """

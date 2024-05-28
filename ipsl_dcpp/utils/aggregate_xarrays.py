@@ -1,6 +1,4 @@
 import xarray 
-import dask 
-import numpy as np
 import os 
 store_dir = os.environ['STORE']
 scratch_dir = os.environ['SCRATCH']

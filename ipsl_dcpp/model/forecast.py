@@ -1,10 +1,7 @@
 import lightning.pytorch as pl
-import torch.nn as nn
 import torch
 import diffusers
-from pathlib import Path
 #from ipsl_dataset import surface_variables
-import numpy as np
 lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
 lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
 #pressure_levels = torch.tensor([  50,  100,  150,  200,  250,  300,  400,  500,  600,  700,  850,  925,1000]).float()

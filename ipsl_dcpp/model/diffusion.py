@@ -1,13 +1,9 @@
-import pytorch_lightning as pl
-import torch.nn as nn
 import torch
 import diffusers
-from pathlib import Path
-from diffusers.training_utils import compute_snr
 from ipsl_dcpp.model.pangu import TimestepEmbedder
 
 
-from .forecast import ForecastModule, pressure_levels, surface_coeffs, level_coeffs, lat_coeffs_equi
+from .forecast import ForecastModule, surface_coeffs, level_coeffs, lat_coeffs_equi
 
 class DiffusionModule(ForecastModule):
     '''

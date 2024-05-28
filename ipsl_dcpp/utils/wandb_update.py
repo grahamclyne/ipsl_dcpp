@@ -1,8 +1,4 @@
-from lightning.pytorch.loggers import WandbLogger
 import os
-from hydra import compose, initialize
-from omegaconf import OmegaConf
-import omegaconf
 import sys
 import subprocess
 import wandb
