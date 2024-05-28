@@ -87,7 +87,7 @@ class SimpleDiffusion(pl.LightningModule):
     #    print(out['next_state_surface'].shape,'out')
         if self.noise_scheduler.config.prediction_type == "v_prediction":
             # estimate input noise
-            alpha = self.noise_scheduler.alphas_cumprod.to(self.device)[timesteps][:, None, None, None, None]
+            alpha = self.noise_scheduler.alphas_cumprod.to(self.device)[timesteps][:, None, None, None]
 
             est_surface_noise = (batch['surface_noisy'] - out['next_state_surface']*alpha.sqrt())/(1-alpha).sqrt().add(1e-6)
            # est_level_noise = (batch['level_noisy'] - out['next_state_level']*alpha.sqrt())/(1-alpha).sqrt().add(1e-6)
@@ -144,6 +144,8 @@ class SimpleDiffusion(pl.LightningModule):
         if lat_coeffs is None:
             lat_coeffs = self.dataset.lat_coeffs_equi
         device = batch['next_state_surface'].device
+        print(pred['next_state_surface'].shape)
+        print(batch['next_state_surface'].shape)
         mse_surface = (pred['next_state_surface'].squeeze() - batch['next_state_surface'].squeeze()).pow(2)
         mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
         loss = mse_surface.sum(1).mean((-3, -2, -1))
