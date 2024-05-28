@@ -39,7 +39,7 @@ module:
   num_cycles: 0.5
   num_training_steps: 300000
   num_inference_steps: 10
-  prediction_type: 'sample'
+  prediction_type: 'v_prediction'
   num_ensemble_members: 3
 
 backbone:

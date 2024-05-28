@@ -85,6 +85,19 @@ class SimpleDiffusion(pl.LightningModule):
             cond_emb += self.timestep_embedder(batch['solar_forcings'][:,wavelength_index]) 
         out = self.backbone(batch, cond_emb)
     #    print(out['next_state_surface'].shape,'out')
+        if self.noise_scheduler.config.prediction_type == "v_prediction":
+            # estimate input noise
+            alpha = self.noise_scheduler.alphas_cumprod.to(self.device)[timesteps][:, None, None, None, None]
+
+            est_surface_noise = (batch['surface_noisy'] - out['next_state_surface']*alpha.sqrt())/(1-alpha).sqrt().add(1e-6)
+           # est_level_noise = (batch['level_noisy'] - out['next_state_level']*alpha.sqrt())/(1-alpha).sqrt().add(1e-6)
+
+            out = dict(next_state_surface=self.noise_scheduler.get_velocity(
+                             out['next_state_surface'], est_surface_noise, timesteps),
+                             #next_state_level=self.noise_scheduler.get_velocity(
+                             #out['next_state_level'], est_level_noise, timesteps)
+                             )
+
         return out
 
     def training_step(self, batch, batch_nb):
@@ -101,17 +114,25 @@ class SimpleDiffusion(pl.LightningModule):
 
         batch['surface_noisy'] = self.noise_scheduler.scale_model_input(batch['surface_noisy'])
         #batch['level_noisy'] = self.noise_scheduler.scale_model_input(batch['level_noisy'])
+        # Get the target for loss depending on the prediction type
+        if self.noise_scheduler.config.prediction_type == "epsilon":
+            target_surface = surface_noise
+        #    target_level = level_noise
+        elif self.noise_scheduler.config.prediction_type == "v_prediction":
+            target_surface = self.noise_scheduler.get_velocity(batch['next_state_surface'], surface_noise, timesteps)
+     #       target_level = self.noise_scheduler.get_velocity(batch['next_state_level'], level_noise, timesteps)
 
-        # Get the target for loss
-        #target_surface = batch['next_state_surface']
-       # target_level = batch['next_state_level']
+        elif self.noise_scheduler.config.prediction_type == "sample":
+            target_surface = batch['next_state_surface']
+      #      target_level = batch['next_state_level']
+
         
         # create uncond
         # sel = (torch.rand((bs,), device=device))
         pred = self.forward(batch, timesteps)
         # compute loss
-       # batch['next_state_surface'] = target_surface
-        #batch['next_state_level'] = target_level
+        batch['next_state_surface'] = target_surface
+    #    batch['next_state_level'] = target_level
 
         _, _, loss = self.loss(pred, batch)
         loss = loss.mean()
