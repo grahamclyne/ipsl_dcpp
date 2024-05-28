@@ -113,7 +113,7 @@ def main(cfg: DictConfig):
     import uuid
     run_id = str(uuid.uuid4()).split('-')[0]
 
-    scratch_dir = os.environ['SCRATCH']
+#    scratch_dir = os.environ['SCRATCH']
     work_dir = os.environ['WORK']
    
     if(cfg.debug):

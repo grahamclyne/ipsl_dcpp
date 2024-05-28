@@ -15,7 +15,7 @@ def get_decadal_ts_avgs(iter_ts,var_index):
     while run_count < 10:
         data = next(iter_ts,None)
         print(data['time'],count)
-        if(data == None):
+        if(data is None):
             return gpp_avgs
         gpp_avgs[count % 117].append(data['state_surface'].squeeze()[var_index])
         if(count % 117 == 0 and count > 100):

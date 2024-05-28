@@ -6,6 +6,7 @@ import hydra
 from hydra import compose, initialize
 import subprocess
 import os
+import pickle
 
 with initialize(version_base=None, config_path="conf"):
     cfg = compose(config_name="config",overrides=["experiment=one_month_multiple_variable_v100"])
@@ -125,7 +126,6 @@ predictions_tas = [compute_predict('6a0adc60',False,'normal',rollout_length,50),
             compute_predict('eb38bfdd',True,'spatial_normal',rollout_length,50),
 
            ]
-import pickle
 
 with open('gpp_predictions.pickle', 'wb') as handle:
     pickle.dump(predictions_gpp, handle, protocol=pickle.HIGHEST_PROTOCOL)

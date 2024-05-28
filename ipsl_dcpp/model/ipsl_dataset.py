@@ -152,9 +152,9 @@ class IPSL_DCPP(torch.utils.data.Dataset):
 
         next_month_index = int(next_time.split('-')[-1]) - 1 
 
-        prev_year_index = int(prev_time.split('-')[0]) - 1960
+       # prev_year_index = int(prev_time.split('-')[0]) - 1960
         cur_year_index = int(time.split('-')[0]) - 1960
-        next_year_index = int(next_time.split('-')[0]) - 1960
+       # next_year_index = int(next_time.split('-')[0]) - 1960
        # cur_year_forcings = np.broadcast_to(np.expand_dims(self.atmos_forcings[:,cur_year_index],(1,2)),(4,143,144)).astype(np.float32)
         cur_year_forcings = torch.Tensor(self.atmos_forcings[:,cur_year_index])
         cur_solar_forcings = torch.Tensor(self.solar_forcings[cur_year_index,cur_month_index])
@@ -173,10 +173,10 @@ class IPSL_DCPP(torch.utils.data.Dataset):
 
             elif(self.normalization == 'normal' or self.normalization == 'spatial_normal'):
                 input_surface_variables = (input_surface_variables - self.surface_means) / self.surface_stds
-                input_depth_variables = (input_depth_variables - self.depth_means) / self.depth_stds
+            #    input_depth_variables = (input_depth_variables - self.depth_means) / self.depth_stds
 
                 target_surface_variables = (target_surface_variables - self.surface_means) / self.surface_stds
-                target_depth_variables = (target_depth_variables - self.depth_means) / self.depth_stds
+            #    target_depth_variables = (target_depth_variables - self.depth_means) / self.depth_stds
 
             if(self.delta):
            # surface_mask = (self.surface_delta_stds != 0)
