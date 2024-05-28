@@ -85,18 +85,18 @@ class SimpleDiffusion(pl.LightningModule):
             cond_emb += self.timestep_embedder(batch['solar_forcings'][:,wavelength_index]) 
         out = self.backbone(batch, cond_emb)
     #    print(out['next_state_surface'].shape,'out')
-        if self.noise_scheduler.config.prediction_type == "v_prediction":
-            # estimate input noise
-            alpha = self.noise_scheduler.alphas_cumprod.to(self.device)[timesteps][:, None, None, None]
+        # if self.noise_scheduler.config.prediction_type == "v_prediction":
+        #     # estimate input noise
+        #     alpha = self.noise_scheduler.alphas_cumprod.to(self.device)[timesteps][:, None, None, None]
 
-            est_surface_noise = (batch['surface_noisy'] - out['next_state_surface']*alpha.sqrt())/(1-alpha).sqrt().add(1e-6)
-           # est_level_noise = (batch['level_noisy'] - out['next_state_level']*alpha.sqrt())/(1-alpha).sqrt().add(1e-6)
+        #     est_surface_noise = (batch['surface_noisy'] - out['next_state_surface']*alpha.sqrt())/(1-alpha).sqrt().add(1e-6)
+        #    # est_level_noise = (batch['level_noisy'] - out['next_state_level']*alpha.sqrt())/(1-alpha).sqrt().add(1e-6)
 
-            out = dict(next_state_surface=self.noise_scheduler.get_velocity(
-                             out['next_state_surface'], est_surface_noise, timesteps),
-                             #next_state_level=self.noise_scheduler.get_velocity(
-                             #out['next_state_level'], est_level_noise, timesteps)
-                             )
+        #     out = dict(next_state_surface=self.noise_scheduler.get_velocity(
+        #                      out['next_state_surface'], est_surface_noise, timesteps),
+        #                      #next_state_level=self.noise_scheduler.get_velocity(
+        #                      #out['next_state_level'], est_level_noise, timesteps)
+        #                      )
 
         return out
 
@@ -149,6 +149,7 @@ class SimpleDiffusion(pl.LightningModule):
         mse_surface = (pred['next_state_surface'].squeeze() - batch['next_state_surface'].squeeze()).pow(2)
         mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
         loss = mse_surface.sum(1).mean((-3, -2, -1))
+        print(loss)
         return mse_surface, None, loss
 
     def sample_rollout(self, batch, *args, lead_time_months, **kwargs):
