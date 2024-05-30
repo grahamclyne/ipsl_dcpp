@@ -144,12 +144,9 @@ class SimpleDiffusion(pl.LightningModule):
         if lat_coeffs is None:
             lat_coeffs = self.dataset.lat_coeffs_equi
         device = batch['next_state_surface'].device
-        print(pred['next_state_surface'].shape)
-        print(batch['next_state_surface'].shape)
         mse_surface = (pred['next_state_surface'].squeeze() - batch['next_state_surface'].squeeze()).pow(2)
         mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
         loss = mse_surface.sum(1).mean((-3, -2, -1))
-        print(loss)
         return mse_surface, None, loss
 
     def sample_rollout(self, batch, *args, lead_time_months, **kwargs):
@@ -212,7 +209,7 @@ class SimpleDiffusion(pl.LightningModule):
         generator.manual_seed(seed)
 
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
-
+        steps = []
         local_batch['surface_noisy'] = surface_noise.to(self.device)
         with torch.no_grad():
             for t in scheduler.timesteps:
@@ -221,7 +218,7 @@ class SimpleDiffusion(pl.LightningModule):
                 local_batch['surface_noisy'] = scheduler.step(pred['next_state_surface'], t, 
                                                             local_batch['surface_noisy'], 
                                                             generator=generator).prev_sample
-               # steps.append(local_batch['surface_noisy'])
+                steps.append(local_batch['surface_noisy'])
                 # print(local_batch['state_surface'].shape,'local batch')
                 # a hack to readjust what is modified in the forward loop
                 # print(local_batch['state_surface'].shape) 
@@ -234,7 +231,7 @@ class SimpleDiffusion(pl.LightningModule):
             sample,batch = self.dataset.denormalize(sample, batch)
 
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
-        return sample,batch
+        return sample,batch,steps
 
     def validation_step(self, batch, batch_nb):
             # for the validation, we make some generations and log them 
