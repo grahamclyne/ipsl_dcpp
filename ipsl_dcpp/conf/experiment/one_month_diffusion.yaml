@@ -1,16 +1,16 @@
 name: 'ipsl_emulation'
-num_cpus_per_task: 20
+num_cpus_per_task: 4
 lead_time_months: 1
 #see http://www.idris.fr/eng/jean-zay/gpu/jean-zay-gpu-exec_partition_slurm-eng.html for gpu to cpu ratio for different partitions
-num_gpus: 2
-gpu_type: v100
-train_batch_size: 8
-val_batch_size: 8
+num_gpus: 1
+gpu_type: a100
+train_batch_size: 16
+val_batch_size: 16
 max_epochs: 100
 #qos: "qos_gpu-dev"
-qos: "qos_gpu-t4"
+qos: "qos_gpu-dev"
 #max_steps: 100000
-slurm_time: "02:00:00"
+slurm_time: "00:10:00"
 seed: 0
 depth_multiplier: 1
 train_dataset:
@@ -38,14 +38,15 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 300000
-  num_inference_steps: 10
+  num_inference_steps: 50
   prediction_type: 'v_prediction'
   num_ensemble_members: 3
+  p_uncond: 0.2
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
   soil: False
-  plev: False
+  plev: True
   conv_head: True
   lon_resolution: 144
   lat_resolution: 143
@@ -57,12 +58,12 @@ backbone:
   window_size: [2, 6, 12] 
   depth_multiplier: 2
   position_embs_dim: 0
-  surface_ch: 28
-  level_ch: 0
+  surface_ch: 31
+  level_ch: 8
   depth_ch: 0
   use_skip: False
   delta: False  
-surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps']
+surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 surface_variables_x: [
 #'baresoilFrac',
  'c3PftFrac',

@@ -1,6 +1,6 @@
 from torch import nn 
 from ipsl_dcpp.model.attention_block import CondBasicLayer
-from ipsl_dcpp.model.embedding import PatchEmbed2D
+from ipsl_dcpp.model.embedding import PatchEmbed2D,PatchEmbed3D
 import numpy as np
 import torch
 #from ipsl_dataset import surface_variables,plev_variables,depth_variables
@@ -82,7 +82,7 @@ class PanguWeather(nn.Module):
         #self.zdim = 8 if patch_size[0]==2 else 5 # 5 for patch size 4
         self.soil = soil
         self.zdim = 1 
-      #  self.zdim = zdim + 6 if self.soil else 11
+        self.zdim = 11 if self.plev else 6
         
     #    self.zdim = 7 if self.soil else 1
         #this is some off by one error where the padding makes up for the fact that this is in fact 35x36 if i use lat_resolution and lon_resolution
@@ -103,12 +103,12 @@ class PanguWeather(nn.Module):
             in_chans=surface_ch,  
             embed_dim=emb_dim,
         )
-        # self.plev_patchembed3d = PatchEmbed3D(
-        #     img_size=(19, lat_resolution, lon_resolution),
-        #     patch_size=patch_size,
-        #     in_chans=level_ch,
-        #     embed_dim=emb_dim
-        # )
+        self.plev_patchembed3d = PatchEmbed3D(
+            img_size=(19, lat_resolution, lon_resolution),
+            patch_size=patch_size,
+            in_chans=level_ch,
+            embed_dim=emb_dim
+        )
         # self.depth_patchembed3d = PatchEmbed3D(
         #     img_size=(11, lat_resolution, lon_resolution),
         #     patch_size=patch_size,
@@ -169,8 +169,8 @@ class PanguWeather(nn.Module):
 
         else:
             self.patchrecovery2d = PatchRecovery2D((lat_resolution, lon_resolution), patch_size[1:], out_dim, output_dim)
-          #  self.plev_patchrecovery3d = PatchRecovery3D((19, lat_resolution, lon_resolution), patch_size, out_dim, level_ch)
-            self.depth_patchrecovery3d = PatchRecovery3D((11, lat_resolution, lon_resolution), patch_size, out_dim, depth_ch)
+            self.plev_patchrecovery3d = PatchRecovery3D((19, lat_resolution, lon_resolution), patch_size, out_dim, level_ch)
+          #  self.depth_patchrecovery3d = PatchRecovery3D((11, lat_resolution, lon_resolution), patch_size, out_dim, depth_ch)
     def forward(self, batch,c, **kwargs):
         """
         Args:
@@ -179,10 +179,12 @@ class PanguWeather(nn.Module):
             upper_air (torch.Tensor): 3D 
         """
         surface = batch['state_surface']
-        if(self.plev):
-            upper_air = batch['state_level'].squeeze(-5)
+        # if(self.plev):
+        #     upper_air = batch['state_level'].squeeze(-5)
+        upper_air = batch['state_level']
         if(self.soil):
             depth = batch['state_depth'].squeeze(-5)
+        #breakpoint()
         #constants = batch['state_constant'].squeeze(-4)
         #forcings = batch['forcings']
        # dt = np.vectorize(datetime.datetime.strptime)(batch['time'],'%Y-%m')

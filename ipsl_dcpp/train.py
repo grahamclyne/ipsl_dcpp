@@ -58,7 +58,7 @@ def train(cfg,run_id):
         train,
         batch_size=cfg.experiment.train_batch_size,
         shuffle=True,
-        num_workers=cfg.experiment.num_cpus_per_task
+        num_workers=cfg.experiment.num_cpus_per_task * 2
     )
     val_dataloader = torch.utils.data.DataLoader(
         val,
@@ -107,7 +107,8 @@ def train(cfg,run_id):
         val_dataloaders=val_dataloader
     )
 
-@hydra.main(version_base=None,config_path='./conf',config_name="config.yaml")
+#@hydra.main(version_base=None,config_path='./conf',config_name="config.yaml")
+@hydra.main(config_path='./conf',config_name="config.yaml")
 def main(cfg: DictConfig):
     
     import uuid
@@ -128,26 +129,26 @@ def main(cfg: DictConfig):
     Path(f'{log_path}/{run_id}_{exp_id}').mkdir()
     aex = submitit.AutoExecutor(folder=f'{log_path}/{run_id}_{exp_id}')
     if cfg.environment.name == 'jean_zay' and cfg.experiment.gpu_type == 'a100': # run on jean zay a100
+         torch.set_float32_matmul_precision('medium') # can be 'high' too ? 
          aex.update_parameters(tasks_per_node=cfg.experiment.num_gpus, 
                                  nodes=1, 
                                  gpus_per_node=cfg.experiment.num_gpus, 
-                                 #timeout_min=20*60,
-                                 #timeout_min=5,
                                  slurm_time=cfg.experiment.slurm_time,
-                                 cpus_per_task=cfg.experiment.num_cpus_per_task,
-                                 #slurm_partition="gpu_p5",
                                  slurm_account="mlr@a100",
                                  slurm_job_name=cfg.experiment.name,
-                                 slurm_constraint="a100"
+                                 slurm_constraint="a100",
+                               #  slurm_exclusive=True
                              )
     elif cfg.environment.name == 'jean_zay' and cfg.experiment.gpu_type == 'v100': # run on jean zay a100
         aex.update_parameters(tasks_per_node=cfg.experiment.num_gpus, 
                                  nodes=1, 
                                  gpus_per_node=cfg.experiment.num_gpus, 
                                  slurm_time=cfg.experiment.slurm_time,
-                                 cpus_per_task=cfg.experiment.num_cpus_per_task,
+                                # cpus_per_task=cfg.experiment.num_cpus_per_task,
                                  slurm_account="mlr@v100",
                                  slurm_job_name=cfg.experiment.name,
+                              #   slurm_exclusive=True,
+
                                  #slurm_hint='nomultithread',
                                  
                                  slurm_constraint='v100-32g',

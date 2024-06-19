@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - environment: local
+  - environment: jean_zay
   - experiment: one_month_diffusion
 #to override, use: python run.py environment=cleps
 

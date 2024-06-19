@@ -1,17 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=unet_ipsl     # job name
+#SBATCH --job-name=aggregate     # job name
 #SBATCH --ntasks=1                   # number of MP tasks
 #SBATCH --ntasks-per-node=1          # number of MPI tasks per node
-#SBATCH --cpus-per-task=1            # number of cores per tasks
+#SBATCH --cpus-per-task=1      # number of cores per tasks
 #SBATCH --hint=nomultithread         # we get physical cores not logical
-#SBATCH --time=20:00:00              # maximum execution time (HH:MM:SS)
+#SBATCH --time=8:00:00              # maximum execution time (HH:MM:SS)
 #SBATCH --output=aggregate_%j.out # output file name
 #SBATCH --error=aggregate_%j.err  # error file name
 #SBATCH --account=mlr@cpu
-cd ${WORK}
+cd ${WORK}/ipsl_dcpp/ipsl_dcpp
 
-source miniconda3/etc/profile.d/conda.sh
-conda init bash
-conda activate env_gpu3 
+module load pytorch-gpu/py3/2.2.0
 
-srun python ./ipsl_dcpp/aggregate_xarrays.py
+srun python ./utils/aggregate_xarrays.py

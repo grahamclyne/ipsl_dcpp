@@ -6,6 +6,10 @@ from ipsl_dcpp.model.pangu import TimestepEmbedder
 from ipsl_dcpp.evaluation.metrics import EnsembleMetrics
 import datetime
 import numpy as np
+import time
+import pandas as pd
+import os 
+import pickle
 def inc_time(batch_time):
     batch_time = datetime.datetime.strptime(batch_time,'%Y-%m')
     if(batch_time.month == 12):
@@ -31,7 +35,8 @@ class SimpleDiffusion(pl.LightningModule):
         dataset,
         num_inference_steps,
         prediction_type,
-        num_ensemble_members
+        num_ensemble_members,
+        p_uncond,
     ):
         super().__init__()
         self.__dict__.update(locals())
@@ -53,6 +58,19 @@ class SimpleDiffusion(pl.LightningModule):
                                                        clip_sample_range=1e6,
                                                        rescale_betas_zero_snr=True,
                                                        )
+        self.p_uncond = p_uncond
+        
+    def init_from_ckpt(self, path, ignore_keys=list()):
+        sd = torch.load(path, map_location="cpu")["state_dict"]
+        keys = list(sd.keys())
+        for k in keys:
+            for ik in ignore_keys:
+                if k.startswith(ik):
+                    print("Deleting key {} from state_dict.".format(k))
+                    del sd[k]
+        self.load_state_dict(sd, strict=False)
+        print(f"Restored from {path}")
+       
     def mylog(self, dct={}, **kwargs):
         mode = 'train_' if self.training else 'val_'
         dct.update(kwargs)
@@ -60,15 +78,16 @@ class SimpleDiffusion(pl.LightningModule):
             self.log(mode+k, v, prog_bar=True,sync_dist=True)
 
     def forward(self, batch, timesteps, sel=1):
-
+        
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
-      #  print(sel.shape)
- #       print(batch['surface_noisy'].shape)
- #       print(batch['state_surface'].shape)
- #       print(batch['state_constant'].shape)      
+        #print(sel.shape)
+        # print(batch['surface_noisy'].shape)
+        # print(batch['state_surface'].shape)
+        # print(batch['state_constant'].shape)
+        # print(batch['prev_state_surface'].shape)
        # batch['surface_noisy'] = batch['surface_noisy'].squeeze(1)
-        batch['state_surface'] = torch.cat([batch['state_surface'],batch['prev_state_surface'], 
+        batch['state_surface'] = torch.cat([batch['state_surface']*sel,batch['prev_state_surface']*sel, 
                                    batch['surface_noisy'],batch['state_constant']], dim=1)
   #      print(batch['state_surface'].shape, 'concatenated')
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
@@ -128,8 +147,8 @@ class SimpleDiffusion(pl.LightningModule):
 
         
         # create uncond
-        # sel = (torch.rand((bs,), device=device))
-        pred = self.forward(batch, timesteps)
+        sel = (torch.rand((bs,), device=device) > self.p_uncond)
+        pred = self.forward(batch, timesteps,sel[:,None,None,None])
         # compute loss
         batch['next_state_surface'] = target_surface
     #    batch['next_state_level'] = target_level
@@ -149,30 +168,41 @@ class SimpleDiffusion(pl.LightningModule):
         loss = mse_surface.sum(1).mean((-3, -2, -1))
         return mse_surface, None, loss
 
-    def sample_rollout(self, batch, *args, lead_time_months, **kwargs):
+    def sample_rollout(self, batch, *args, lead_time_months, seed,**kwargs):
+        device = batch['state_surface'].device
         history = dict(state_surface=[])
         next_time = batch['next_time']    
         cur_year_index = int(next_time[0].split('-')[0]) - 1960
         cur_month_index = int(next_time[0].split('-')[-1]) - 1
         inc_time_vec = np.vectorize(inc_time)
+
+
         for i in range(lead_time_months):
-            sample,batch = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler=self.scheduler)
+            start = time.time()
+
+            print(i,'lead_time')
+            sample,batch = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler=self.scheduler,seed=seed)
             history['state_surface'].append(sample['next_state_surface'])
-            print(len(sample))
-            print(sample)
+#            print(len(sample))
+#            print(sample)
             #only for delta runs
-            state_surface=sample['next_state_surface']*np.expand_dims(self.dataset.surface_delta_stds,0) + batch['state_surface'],
-            print(state_surface)
-            batch = dict(state_surface=state_surface[0],
+            next_time = batch['next_time']    
+            cur_year_index = int(next_time[0].split('-')[0]) - 1960
+            cur_month_index = int(next_time[0].split('-')[-1]) - 1
+            state_surface=sample['next_state_surface'].to(device)*torch.unsqueeze(self.dataset.surface_delta_stds,0).to(device) + batch['state_surface'].to(device)
+#            print(state_surface)
+            batch = dict(state_surface=state_surface,
                          prev_state_surface=batch['state_surface'],
                                #state_level=denorm_sample['next_state_level'],
                                next_state_surface=batch['next_state_surface'],
                                time=next_time,
                                state_constant=batch['state_constant'],
-                                 forcings=torch.Tensor(self.dataset.atmos_forcings[:,cur_year_index]).unsqueeze(0), #I have no idea why i need to unsqueeze here does lightning add a dimenions with the batch? who knows
+                                 forcings=torch.Tensor(self.dataset.atmos_forcings[:,cur_year_index]).unsqueeze(0).to(device), #I have no idea why i need to unsqueeze here does lightning add a dimenions with the batch? who knows
                                  state_depth=torch.empty(0),
-                                 solar_forcings=torch.Tensor(self.dataset.solar_forcings[cur_year_index,cur_month_index]).unsqueeze(0),
+                                 solar_forcings=torch.Tensor(self.dataset.solar_forcings[cur_year_index,cur_month_index]).unsqueeze(0).to(device),
                                next_time=inc_time_vec(next_time))
+            end = time.time()
+            print(f'sample took {end - start} to run')
         return history
         
     def configure_optimizers(self):
@@ -209,7 +239,7 @@ class SimpleDiffusion(pl.LightningModule):
         generator.manual_seed(seed)
 
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
-        steps = []
+ #       steps = []
         local_batch['surface_noisy'] = surface_noise.to(self.device)
         with torch.no_grad():
             for t in scheduler.timesteps:
@@ -218,7 +248,7 @@ class SimpleDiffusion(pl.LightningModule):
                 local_batch['surface_noisy'] = scheduler.step(pred['next_state_surface'], t, 
                                                             local_batch['surface_noisy'], 
                                                             generator=generator).prev_sample
-                steps.append(local_batch['surface_noisy'])
+  #              steps.append(local_batch['surface_noisy'])
                 # print(local_batch['state_surface'].shape,'local batch')
                 # a hack to readjust what is modified in the forward loop
                 # print(local_batch['state_surface'].shape) 
@@ -231,7 +261,7 @@ class SimpleDiffusion(pl.LightningModule):
             sample,batch = self.dataset.denormalize(sample, batch)
 
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
-        return sample,batch,steps
+        return sample,batch
 
     def validation_step(self, batch, batch_nb):
             # for the validation, we make some generations and log them 
@@ -317,4 +347,41 @@ class SimpleDiffusion(pl.LightningModule):
             metric.reset()
 
     def test_step(self, batch, batch_nb):
-        return self.validation_step(batch, batch_nb)
+        scratch = os.environ['SCRATCH']
+        run_id = '20e12882'
+        file_name = 'epoch=45.ckpt'
+        checkpoint_path = f'{scratch}/checkpoint_{run_id}/{file_name}'
+
+        self.init_from_ckpt(checkpoint_path)
+        device = batch['state_surface'].device
+        x = np.stack(self.dataset.timestamps)[:,2]
+        indices = np.stack(self.dataset.timestamps)[np.where((pd.to_datetime(x).year == 2001) & (pd.to_datetime(x).month == 1),True,False)][:,[0,1]]
+        # 
+        # 
+        # checkpoint_path = torch.load(f'{scratch}/checkpoint_{run_id}/{file_name}',map_location=torch.device('cuda'))
+        # model.load_state_dict(checkpoint_path['state_dict'])
+        # # trainer.test(model, val_dataloader)
+
+        inv_map = {v: k for k, v in self.dataset.id2pt.items()}
+        index = inv_map[(indices[0][0],indices[0][1])]
+
+        batch = self.dataset.__getitem__(index)
+        # batch['state_surface'] = batch['state_surface'].to(device)
+        # batch['prev_state_surface'] = batch['prev_state_surface'].to(device)
+        # batch['forcings'] = batch['forcings'].to(device)
+        batch['state_constant'] = torch.tensor(batch['state_constant'])
+        batch['time'] = [batch['time']]
+        batch['next_time'] = [batch['next_time']]
+        for k, v in batch.items():
+            print(k)
+            if(k != 'time' and k != 'next_time'):
+                batch[k] = batch[k].to(device)
+        
+
+        print(batch['time'])
+        batch = {k: v.unsqueeze(0) if (k != 'time') and (k != 'next_time') else v for k, v in batch.items()}        
+        for i in range(3):
+            print(i,'ensemble member')
+            output = self.sample_rollout(batch, lead_time_months=60,seed = i)
+            with open(f'{i}_rollout_v_predictions_30year_ssp_585_{run_id}_50_inference_steps.pkl','wb') as f:
+                pickle.dump(output,f)

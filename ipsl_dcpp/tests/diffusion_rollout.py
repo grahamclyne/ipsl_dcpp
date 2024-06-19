@@ -25,7 +25,7 @@ val_dataloader = torch.utils.data.DataLoader(
     val,
     batch_size=1,
     shuffle=False,
-    num_workers=1
+    num_workers=20
 )
 
 #batch = next(iter(train_dataloader))
@@ -38,13 +38,12 @@ model = hydra.utils.instantiate(
 
 )
 
-# trainer.logged_metrics
 x = np.stack(val.timestamps)[:,2]
 indices = np.stack(val.timestamps)[np.where((pd.to_datetime(x).year == 2001) & (pd.to_datetime(x).month == 1),True,False)][:,[0,1]]
-run_id = 'feb711a1'
-file_name = 'epoch=06.ckpt'
+run_id = '20e12882'
+file_name = 'epoch=45.ckpt'
 scratch = os.environ['SCRATCH']
-checkpoint_path = torch.load(f'{scratch}/checkpoint_{run_id}/{file_name}',map_location=torch.device('gpu'))
+checkpoint_path = torch.load(f'{scratch}/checkpoint_{run_id}/{file_name}',map_location=torch.device('cuda'))
 model.load_state_dict(checkpoint_path['state_dict'])
 # trainer.test(model, val_dataloader)
 inv_map = {v: k for k, v in val.id2pt.items()}
@@ -59,6 +58,6 @@ for i in range(3):
     batch['next_time'] = [batch['next_time']]
     print(batch['time'])
     batch = {k: v.unsqueeze(0) if (k != 'time') and (k != 'next_time') else v for k, v in batch.items()}
-    output = model.sample_rollout(batch, lead_time_months=120,seed = 0)
-    with open(f'{i}_rollout_v_predictions.pkl','wb') as f:
+    output = model.sample_rollout(batch, lead_time_months=360,seed = 0)
+    with open(f'{i}_rollout_v_predictions_30year_ssp_585_{run_id}_50steps.pkl','wb') as f:
         pickle.dump(output,f)

@@ -9,10 +9,14 @@ def convert_to_joined_numpy(year,variation):
     Lmon =  xarray.open_mfdataset(f'{store_dir}/s{year}-r{variation}i1p1f1/Lmon/*.nc',compat='minimal')
     Amon =  xarray.open_mfdataset(f'{store_dir}/s{year}-r{variation}i1p1f1/Amon/*.nc',compat='minimal')
     Emon =  xarray.open_mfdataset(f'{store_dir}/s{year}-r{variation}i1p1f1/Emon/*.nc',compat='override')
+    Omon =  xarray.open_mfdataset(f'{store_dir}/s{year}-r{variation}i1p1f1/Omon/*.nc',compat='minimal')
+
     Lmon = Lmon.drop_vars(['time_bounds','depth_bounds','sector','depth'])
     Amon = Amon.drop_vars(['time_bounds'])
     Emon = Emon.drop_vars(['height','depth','tdps','ppdiat','ppmisc','expfe','olevel_bounds','olevel','flandice','t20d','thetaot','thetaot2000','thetaot300','thetaot700','bounds_nav_lat','bounds_nav_lon','lev','area','type'])
     Emon = Emon.drop_dims(['landuse','x','y','axis_nbounds'])
+    Omon = Omon.drop_dims(['nvertex'])
+    Omon = Omon.drop_vars(['area','time_bounds'])
     # variable_list = list(Lmon.keys()) + list(Amon.keys()) + list(Emon.keys())
     # lon,lat = np.meshgrid(Lmon.lon.data,Lmon.lat.data)
     # Lmon['time'] = Lmon.time.astype('float')
@@ -26,7 +30,7 @@ def convert_to_joined_numpy(year,variation):
     # time = time.reshape(time.shape[2],time.shape[0],time.shape[1])
     # time = time[np.newaxis,:,:,:]
     # total_var_numpy_array = np.concatenate([Lmon.to_array().to_numpy(),Amon.to_array().to_numpy(),Emon.to_array().to_numpy(),lon,lat,time])
-    xarray.merge([Lmon,Amon,Emon]).to_netcdf(f'{scratch_dir}/{year}_{variation}.nc')
+    xarray.merge([Lmon,Amon,Emon,Omon]).to_netcdf(f'{scratch_dir}/{year}_{variation}.nc')
     #np.save(f'{scratch_dir}/{year}_{variation}',total_var_numpy_array)
     
     
@@ -37,7 +41,7 @@ def convert_to_joined_numpy(year,variation):
 #import matplotlib.pyplot as plt
 #plt.hist(ds_numpy[variable_list.index('tasmax')].flatten())
 if __name__ == "__main__":
-    for year in range(1984,2020):
+    for year in range(1999,2020):
         for variation in range(1,11):
             print(year,variation)
             convert_to_joined_numpy(year,variation)

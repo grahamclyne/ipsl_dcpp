@@ -156,13 +156,14 @@ class PatchRecovery3(nn.Module):
       #  output = x[:, 135:287].reshape((x.shape[0], 8, 19, *x.shape[-2:]))
       #  output_depth = x[:,287:].reshape((x.shape[0],3,11,*x.shape[-2:]))
       #  print('after',x.shape)
-        output_surface = x[:,:self.output_dim]
+        output_surface = x[:,:9]
+        
         if(self.soil):
             output_depth = x[:,91:94].reshape((x.shape[0],3,11,*x.shape[-2:]))
         else:
             output_depth = torch.empty(0)
         if(self.plev):
-            output_plev = x[:,94:].reshape((x.shape[0],8,19,*x.shape[-2:]))
+            output_plev = x[:,9:].reshape((x.shape[0],8,19,*x.shape[-2:]))
         else:
             output_plev = torch.empty(0)
         return output_surface,output_depth,output_plev
