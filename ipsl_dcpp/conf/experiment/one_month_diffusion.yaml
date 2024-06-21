@@ -38,7 +38,7 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 300000
-  num_inference_steps: 50
+  num_inference_steps: 10
   prediction_type: 'v_prediction'
   num_ensemble_members: 3
   p_uncond: 0.2
@@ -46,7 +46,7 @@ module:
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
   soil: False
-  plev: True
+  plev: False
   conv_head: True
   lon_resolution: 144
   lat_resolution: 143
@@ -58,12 +58,15 @@ backbone:
   window_size: [2, 6, 12] 
   depth_multiplier: 2
   position_embs_dim: 0
-  surface_ch: 31
-  level_ch: 8
+  #surface_ch: 31
+  surface_ch: 28
+  level_ch: 0
+  #level_ch: 8
   depth_ch: 0
   use_skip: False
   delta: False  
-surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
+#surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
+surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps']
 surface_variables_x: [
 #'baresoilFrac',
  'c3PftFrac',

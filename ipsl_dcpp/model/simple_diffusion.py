@@ -181,20 +181,27 @@ class SimpleDiffusion(pl.LightningModule):
             start = time.time()
 
             print(i,'lead_time')
-            sample,batch = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler=self.scheduler,seed=seed)
-            history['state_surface'].append(sample['next_state_surface'])
+            sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler='ddpm',seed=seed)
 #            print(len(sample))
 #            print(sample)
             #only for delta runs
+            print(sample)
             next_time = batch['next_time']    
             cur_year_index = int(next_time[0].split('-')[0]) - 1960
             cur_month_index = int(next_time[0].split('-')[-1]) - 1
-            state_surface=sample['next_state_surface'].to(device)*torch.unsqueeze(self.dataset.surface_delta_stds,0).to(device) + batch['state_surface'].to(device)
+            # print(sample['next_state_surface'].shape)
+            # print(batch['state_surface'].shape)
+            # print(self.dataset.surface_delta_stds.shape)
+            new_state_surface=sample['next_state_surface'].to(device)*torch.unsqueeze(self.dataset.surface_delta_stds,0).to(device) + batch['state_surface'].to(device)
+          #  prev_state_surface=sample['state_surface'].to(device)*torch.unsqueeze(self.dataset.surface_delta_stds,0).to(device) + batch['state_surface'].to(device)
+            
+            history['state_surface'].append(new_state_surface)
+
 #            print(state_surface)
-            batch = dict(state_surface=state_surface,
+            batch = dict(state_surface=new_state_surface,
                          prev_state_surface=batch['state_surface'],
                                #state_level=denorm_sample['next_state_level'],
-                               next_state_surface=batch['next_state_surface'],
+                             #  next_state_surface=batch['next_state_surface'],
                                time=next_time,
                                state_constant=batch['state_constant'],
                                  forcings=torch.Tensor(self.dataset.atmos_forcings[:,cur_year_index]).unsqueeze(0).to(device), #I have no idea why i need to unsqueeze here does lightning add a dimenions with the batch? who knows
@@ -204,20 +211,6 @@ class SimpleDiffusion(pl.LightningModule):
             end = time.time()
             print(f'sample took {end - start} to run')
         return history
-        
-    def configure_optimizers(self):
-        opt = torch.optim.AdamW(self.parameters(), 
-                                lr=self.lr, betas=self.betas, 
-                                weight_decay=self.weight_decay)
-        sched = diffusers.optimization.get_cosine_schedule_with_warmup(
-            opt,
-            num_warmup_steps=self.num_warmup_steps,
-            num_training_steps=self.num_training_steps,
-            num_cycles=self.num_cycles)
-        sched = { 'scheduler': sched,
-                        'interval': 'step', # or 'epoch'
-                        'frequency': 1}
-        return [opt], [sched]
 
     def sample(self, batch, 
                 scheduler,
@@ -231,157 +224,112 @@ class SimpleDiffusion(pl.LightningModule):
             cf_guidance = 1
         if scheduler == 'ddpm':
             scheduler = self.noise_scheduler
+        elif scheduler == 'ddim':
+            from diffusers import DDIMScheduler
+            sched_cfg = self.noise_scheduler.config
+            scheduler = DDIMScheduler(num_train_timesteps=sched_cfg.num_train_timesteps,
+                                                       beta_schedule=sched_cfg.beta_schedule,
+                                                       prediction_type=sched_cfg.prediction_type,
+                                                       beta_start=sched_cfg.beta_start,
+                                                       beta_end=sched_cfg.beta_end,
+                                                       clip_sample=False,
+                                                       clip_sample_range=1e6)
+            
 
         scheduler.set_timesteps(num_inference_steps)
 
         local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
-        generator = torch.Generator(device='cpu')
+        generator = torch.Generator(device=batch['state_surface'].device)
         generator.manual_seed(seed)
-
+    
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
- #       steps = []
+        steps = []
         local_batch['surface_noisy'] = surface_noise.to(self.device)
         with torch.no_grad():
             for t in scheduler.timesteps:
+              #  prev_t = scheduler.previous_timestep(t)
+
+            #    alpha_prod_t = scheduler.alphas_cumprod[t]
+              #  alpha_prod_t_prev = scheduler.alphas_cumprod[prev_t] if prev_t >= 0 else scheduler.one
+             #   beta_prod_t = 1 - alpha_prod_t
+            #    beta_prod_t_prev = 1 - alpha_prod_t_prev
+            #    current_alpha_t = alpha_prod_t / alpha_prod_t_prev
+             #   current_beta_t = 1 - current_alpha_t
                 print(t)
+                print(local_batch['surface_noisy'][0,0,0,:],'next time step')
+
+                #sel = (torch.rand((1,), device='cpu') > self.p_uncond)
                 pred = self.forward(local_batch, torch.tensor([t]).to(self.device))
+                #scheduler step finds the actual output (in this case, the delta) where next_state_surface is the velocity predicted
+                #uses https://github.com/huggingface/diffusers/blob/668e34c6e0019b29c887bcc401c143a7d088cb25/src/diffusers/schedulers/scheduling_ddpm.py#L525
                 local_batch['surface_noisy'] = scheduler.step(pred['next_state_surface'], t, 
                                                             local_batch['surface_noisy'], 
                                                             generator=generator).prev_sample
-  #              steps.append(local_batch['surface_noisy'])
-                # print(local_batch['state_surface'].shape,'local batch')
-                # a hack to readjust what is modified in the forward loop
-                # print(local_batch['state_surface'].shape) 
+                #(alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
+               # pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
 
+               # local_batch['surface_noisy'] = (((alpha_prod_t**0.5) * local_batch['surface_noisy']) - vel) /(beta_prod_t**0.5)
                 #due to the way the model is set up, the state_surface is modified in the forward loop
+                steps.append(local_batch['state_surface'])
                 local_batch['state_surface'] = local_batch['state_surface'][:,:9]
-            sample = dict(next_state_surface=local_batch['surface_noisy'])
+            
+            sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'])
             
         if denormalize:
             sample,batch = self.dataset.denormalize(sample, batch)
 
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
-        return sample,batch
+        return sample
 
-    def validation_step(self, batch, batch_nb):
-            # for the validation, we make some generations and log them 
-            samples = [self.sample(batch, num_inference_steps=self.num_inference_steps, 
-                                    denormalize=True, 
-                                    scheduler='ddpm', 
-                                    seed = j)
-                                for j in range(self.num_members)]
-            
-            # denorm_samples = [self.dataset.denormalize(s, batch) for s in samples]
-            denorm_batch = samples[0][1]
-            denorm_samples = [x[0] for x in samples]
+    def configure_optimizers(self):
+        opt = torch.optim.AdamW(self.parameters(), 
+                                lr=self.lr, betas=self.betas, 
+                                weight_decay=self.weight_decay)
+        sched = diffusers.optimization.get_cosine_schedule_with_warmup(
+            opt,
+            num_warmup_steps=self.num_warmup_steps,
+            num_training_steps=self.num_training_steps,
+            num_cycles=self.num_cycles)
+        sched = { 'scheduler': sched,
+                        'interval': 'step', # or 'epoch'
+                        'frequency': 1}
+        return [opt], [sched]
+    # def test_step(self, batch, batch_nb):
+    #     scratch = os.environ['SCRATCH']
+    #     run_id = '20e12882'
+    #     file_name = 'epoch=45.ckpt'
+    #     checkpoint_path = f'{scratch}/checkpoint_{run_id}/{file_name}'
 
-            #denorm_sample1, denorm_batch = self.dataset.denormalize(sample1, batch)
-            #denorm_sample2, _ = self.dataset.denormalize(sample2, batch)
+    #     self.init_from_ckpt(checkpoint_path)
+    #     device = batch['state_surface'].device
+    #     x = np.stack(self.dataset.timestamps)[:,2]
+    #     indices = np.stack(self.dataset.timestamps)[np.where((pd.to_datetime(x).year == 2001) & (pd.to_datetime(x).month == 1),True,False)][:,[0,1]]
+    #     # 
+    #     # 
+    #     # checkpoint_path = torch.load(f'{scratch}/checkpoint_{run_id}/{file_name}',map_location=torch.device('cuda'))
+    #     # model.load_state_dict(checkpoint_path['state_dict'])
+    #     # # trainer.test(model, val_dataloader)
 
-            self.metrics.update(denorm_batch, denorm_samples)
-            samples = None
-          #  self.classifier_score.update(denorm_batch, denorm_samples)
-            # avg = dict(next_state_level=(sample1['next_state_level']+sample2['next_state_level'])/2,
-            #             next_state_surface = (sample1['next_state_surface']+sample2['next_state_surface'])/2)
-            
-            # err_level = mse(batch['next_state_level'] - avg['next_state_level']).mean(0)
-            # err_surface = mse(batch['next_state_surface'] - avg['next_state_surface']).mean(0)
-            
-            # var_level = mse(torch.cat([sample1['next_state_level'],
-            #                        sample2['next_state_level']], 0).var(0).sqrt()).mean(0)
-            # var_surface = mse(torch.cat([sample1['next_state_surface'],
-            #                           sample2['next_state_surface']], 0).var(0).sqrt()).mean(0)
+    #     inv_map = {v: k for k, v in self.dataset.id2pt.items()}
+    #     index = inv_map[(indices[0][0],indices[0][1])]
 
-            # n_members = sample1['next_state_surface'].shape[0] + sample2['next_state_surface'].shape[0]
-
-            # skr_level = (1 + 1/n_members)**.5 * var_level.sqrt()/err_level.sqrt()
-            # skr_surface = (1 + 1/n_members)**.5 * var_surface.sqrt()/err_surface.sqrt()
-
-            # # also check cross-seed variance ?
-            # avg_seed = dict(next_state_level=(sample1['next_state_level'][0]+sample1['next_state_level'][1])/2,
-            #             next_state_surface = (sample1['next_state_surface'][0]+sample1['next_state_surface'][1])/2)
-
-            # csvar_level = mse(torch.stack([sample1['next_state_level'][0],
-            #                             sample2['next_state_level'][0]]).var(0).sqrt())[0]
-            # csvar_surface = mse(torch.stack([sample1['next_state_surface'][0],
-            #                                 sample2['next_state_surface'][0]]).var(0).sqrt())[0]
-            # n_members = 2
-            # csr_level = (1 + 1/n_members)**.5 * csvar_level.sqrt()/err_level.sqrt()
-            # csr_surface = (1 + 1/n_members)**.5 * csvar_surface.sqrt()/err_surface.sqrt()
-                        
-            # self.mylog(skr_z500=skr_level[0, 7])
-            # self.mylog(skr_t2m=skr_surface[2, 0])
-
-            # self.mylog(csr_z500=csr_level[0, 7])
-            # self.mylog(csr_t2m=csr_surface[2, 0])
-            # sample1, sample2 = samples[:2]
-            # if hasattr(self.logger, 'log_image'):
-            #     for i in range(batch['next_state_surface'].shape[0]):
-            #         t2m_images = [batch['next_state_surface'][i, 2, 0], sample1['next_state_surface'][i, 2, 0], sample2['next_state_surface'][i, 2, 0]]
-            #         z500_images = [batch['next_state_level'][i, 0, 7], sample1['next_state_level'][i, 0, 7], sample2['next_state_level'][i, 0, 7]]
-            #         m_t2m = min([x.min() for x in t2m_images])
-            #         M_t2m = max([x.max() for x in t2m_images])
-            #         M_t2m = max([M_t2m, -m_t2m])
-            #         m_z500 = min([x.min() for x in z500_images])
-            #         M_z500 = max([x.max() for x in z500_images])
-            #         M_z500 = max([M_z500, -m_z500])
-
-            #         t2m_images = [bw_to_bwr(x, m=-M_t2m, M=M_t2m) for x in t2m_images]
-            #         z500_images = [bw_to_bwr(x, m=-M_z500, M=M_z500) for x in z500_images]
-
-            #         self.logger.log_image(key='t2m samples', images=t2m_images, caption = ['gt '+batch['time'][i], 'sample1', 'sample2'], step=self.global_step)
-            #         self.logger.log_image(key='z500 samples', images=z500_images, caption = ['gt '+batch['time'][i], 'sample1', 'sample2'], step=self.global_step)
-
-            #         # lets only log once for now
-            #         break
-
-            return None
-            #return self.training_step(batch, batch_nb)
-
-
-    def on_validation_epoch_end(self):
-        for metric in [self.metrics]:
-            out = metric.compute()
-            self.log_dict(out)# dont put on_epoch = True here
-            print(out)
-            metric.reset()
-
-    def test_step(self, batch, batch_nb):
-        scratch = os.environ['SCRATCH']
-        run_id = '20e12882'
-        file_name = 'epoch=45.ckpt'
-        checkpoint_path = f'{scratch}/checkpoint_{run_id}/{file_name}'
-
-        self.init_from_ckpt(checkpoint_path)
-        device = batch['state_surface'].device
-        x = np.stack(self.dataset.timestamps)[:,2]
-        indices = np.stack(self.dataset.timestamps)[np.where((pd.to_datetime(x).year == 2001) & (pd.to_datetime(x).month == 1),True,False)][:,[0,1]]
-        # 
-        # 
-        # checkpoint_path = torch.load(f'{scratch}/checkpoint_{run_id}/{file_name}',map_location=torch.device('cuda'))
-        # model.load_state_dict(checkpoint_path['state_dict'])
-        # # trainer.test(model, val_dataloader)
-
-        inv_map = {v: k for k, v in self.dataset.id2pt.items()}
-        index = inv_map[(indices[0][0],indices[0][1])]
-
-        batch = self.dataset.__getitem__(index)
-        # batch['state_surface'] = batch['state_surface'].to(device)
-        # batch['prev_state_surface'] = batch['prev_state_surface'].to(device)
-        # batch['forcings'] = batch['forcings'].to(device)
-        batch['state_constant'] = torch.tensor(batch['state_constant'])
-        batch['time'] = [batch['time']]
-        batch['next_time'] = [batch['next_time']]
-        for k, v in batch.items():
-            print(k)
-            if(k != 'time' and k != 'next_time'):
-                batch[k] = batch[k].to(device)
+    #     batch = self.dataset.__getitem__(index)
+    #     # batch['state_surface'] = batch['state_surface'].to(device)
+    #     # batch['prev_state_surface'] = batch['prev_state_surface'].to(device)
+    #     # batch['forcings'] = batch['forcings'].to(device)
+    #     batch['state_constant'] = torch.tensor(batch['state_constant'])
+    #     batch['time'] = [batch['time']]
+    #     batch['next_time'] = [batch['next_time']]
+    #     for k, v in batch.items():
+    #         print(k)
+    #         if(k != 'time' and k != 'next_time'):
+    #             batch[k] = batch[k].to(device)
         
 
-        print(batch['time'])
-        batch = {k: v.unsqueeze(0) if (k != 'time') and (k != 'next_time') else v for k, v in batch.items()}        
-        for i in range(3):
-            print(i,'ensemble member')
-            output = self.sample_rollout(batch, lead_time_months=60,seed = i)
-            with open(f'{i}_rollout_v_predictions_30year_ssp_585_{run_id}_50_inference_steps.pkl','wb') as f:
-                pickle.dump(output,f)
+    #     print(batch['time'])
+    #     batch = {k: v.unsqueeze(0) if (k != 'time') and (k != 'next_time') else v for k, v in batch.items()}        
+    #     for i in range(3):
+    #         print(i,'ensemble member')
+    #         output = self.sample_rollout(batch, lead_time_months=60,seed = i)
+    #         with open(f'{i}_rollout_v_predictions_30year_ssp_585_{run_id}_50_inference_steps.pkl','wb') as f:
+    #             pickle.dump(output,f)

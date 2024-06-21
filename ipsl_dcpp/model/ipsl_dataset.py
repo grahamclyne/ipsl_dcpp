@@ -39,7 +39,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.files = dict(
                   all_=[str(x) for x in self.files],
             #need to go to only 2004 because atmos forcings only go to 2014
-                  train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,1961))])],
+                  train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1961,1962))])],
                   val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2000,2004))])],
                   test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2013,2016))])])[domain]
         #by ensemble member
@@ -52,7 +52,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.nfiles = len(self.files)
         self.xr_options = dict(engine='netcdf4', cache=True)
         self.lead_time_months = lead_time_months
-        temp = xr.open_dataset(self.files[0])
+        print(self.files)
+       # temp = xr.open_dataset(self.files[0])
         #stats_variable_subset = [list(temp.keys()).index(var) for var in surface_variables]
         #print(stats_variable_subset)
         variable_subset = [50, 87, 88, 89, 6, 25, 13, 14, 34]
