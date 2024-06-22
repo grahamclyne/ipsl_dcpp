@@ -29,7 +29,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
 
         self.domain = domain
         #self.files = list(glob.glob(f'{self.scratch}/*_1.nc'))
-        self.files = list(glob.glob(f'{self.scratch}/*.nc'))
+        self.files = list(glob.glob(f'{scratch_path}/*.nc'))
         self.normalization = normalization
         self.var_mask = torch.from_numpy(np.load(f'{self.work}/data/land_mask.npy'))
    #     self.files = list(glob.glob(f'{self.scratch}/1970*.nc'))

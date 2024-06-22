@@ -72,7 +72,6 @@ class PanguWeather(nn.Module):
                  use_skip,
                  conv_head,
                  soil,
-                delta,
                 plev
                 ):
         super().__init__()

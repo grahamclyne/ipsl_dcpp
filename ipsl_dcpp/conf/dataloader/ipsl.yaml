@@ -1,0 +1,11 @@
+dataset:
+  _target_: ipsl_dcpp.model.ipsl_dataset.IPSL_DCPP
+  delta: True
+  normalization: 'climatology'
+  generate_statistics: False
+  lead_time_months: 1
+  surface_variables: ${module.surface_variables} 
+  depth_variables: ${module.depth_variables} 
+  plev_variables: ${module.plev_variables} 
+  work_path: ${cluster.work_path},
+  scratch_path: ${cluster.data_path},

@@ -13,7 +13,6 @@ class ForecastModule(pl.LightningModule):
     def __init__(self, 
                  backbone,
                  dataset,
-                 delta,
                  lr, 
                  betas,
                  weight_decay,
@@ -79,7 +78,6 @@ class ForecastModule(pl.LightningModule):
 
     def training_step(self, batch, batch_nb):
         pred = self.forward(batch)
-       # if self.delta:
        #     pred = dict(#next_state_level=batch['state_level']+pred['next_state_level'],
        #                next_state_surface=batch['state_surface']+pred['next_state_surface'],
        #                next_state_depth=batch['state_depth']+pred['next_state_depth'])

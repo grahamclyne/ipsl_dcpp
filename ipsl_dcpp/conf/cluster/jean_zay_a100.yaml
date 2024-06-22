@@ -1,0 +1,28 @@
+data_path: /gpfsscratch/rech/mlr/udy16au/
+work_path: /gpfswork/rech/mlr/udy16au/ipsl_dcpp/ipsl_dcpp
+wandb_dir: /gpfsscratch/rech/mlr/udy16au/wandb/
+wandb_mode: offline
+manual_requeue: True
+
+precision: 16-mixed
+batch_size: 16
+gpus: 2
+cpus: 16
+
+folder: ./sblogs/${name}/
+
+launcher:
+    cpus_per_task: 8 # need 8 to correctly allocate memory even if we use less
+    gpus_per_node: ${cluster.gpus}
+    nodes: 1
+    tasks_per_node: ${cluster.gpus}
+    timeout_min: 10
+    name: ${name}
+    slurm_partition: gpu_p5
+    slurm_constraint: a100
+    slurm_account: mlr@a100
+    slurm_additional_parameters:
+      hint: nomultithread
+    slurm_srun_args:
+      - "--cpu-bind=none"
+      - "--mem-bind=none"

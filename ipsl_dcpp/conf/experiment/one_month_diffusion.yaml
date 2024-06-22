@@ -30,7 +30,7 @@ val_dataset:
   generate_statistics: False
 
 module:
-  _target_: ipsl_dcpp.model.simple_diffusion.SimpleDiffusion
+  _target_: ipsl_dcpp.model.diffusion.Diffusion
   num_diffusion_timesteps: 1000
   lr: 3e-4
   weight_decay: 0
