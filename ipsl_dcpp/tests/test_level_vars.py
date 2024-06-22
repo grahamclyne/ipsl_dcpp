@@ -8,9 +8,6 @@ from omegaconf import OmegaConf
 import hydra
 import os
 os.environ['SLURM_NTASKS_PER_NODE'] = '1'
-#torch.set_default_dtype(torch.float32)
-# os.environ["CUDA_VISIBLE_DEVICES"]=""
-#torch.set_default_tensor_type(torch.FloatTensor)
 
 with initialize(config_path="../conf"):
     cfg = compose(config_name="config")
@@ -31,7 +28,7 @@ train_dataloader = torch.utils.data.DataLoader(
     train,
     batch_size=1,
     shuffle=True,
-    num_workers=1
+    num_workers=0
 )
 
 #batch = next(iter(train_dataloader))
@@ -43,24 +40,17 @@ model = hydra.utils.instantiate(
     dataset=train_dataloader.dataset
 )
 trainer = pl.Trainer(
-    max_epochs=cfg.experiment.max_epochs,
     enable_checkpointing=True,
     log_every_n_steps=1,
-   # max_steps=cfg.experiment.max_steps if not cfg.debug else 10,
+    max_steps=cfg.experiment.max_steps if not cfg.debug else 10,
     precision="16-mixed",
     #precision='32',
     profiler='simple' if cfg.debug else None,
-   # devices=cfg.experiment.num_gpus,
-   # strategy='ddp_find_unused_parameters_true',
-    #limit_train_batches=0.01 if cfg.debug else 1
-    #limit_val_batches=0.01 if cfg.debug else 1,
     num_sanity_val_steps=0,
-  #  device='cpu',
-  #accelerator='mps',
   #CONV3D not supported by mps, have to use cpu when local 
     accelerator= 'cpu' if cfg.environment.name == 'local' else 'gpu',
-   # fast_dev_run=100
 )
+
 trainer.fit(
     model=model,
     train_dataloaders=train_dataloader)

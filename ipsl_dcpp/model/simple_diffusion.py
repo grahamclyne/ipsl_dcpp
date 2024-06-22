@@ -78,15 +78,23 @@ class SimpleDiffusion(pl.LightningModule):
             self.log(mode+k, v, prog_bar=True,sync_dist=True)
 
     def forward(self, batch, timesteps, sel=1):
-        
-        device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
         #print(sel.shape)
+        # batch['state_surface'] = batch['state_surface'].to('cuda')
+        # batch['state_constant']= batch['state_constant'].to('cuda')
+        # batch['prev_state_surface']=batch['prev_state_surface'].to('cuda')
+        device = batch['state_surface'].device
+
         # print(batch['surface_noisy'].shape)
         # print(batch['state_surface'].shape)
         # print(batch['state_constant'].shape)
         # print(batch['prev_state_surface'].shape)
        # batch['surface_noisy'] = batch['surface_noisy'].squeeze(1)
+        # print(batch['state_surface'].device)
+        # print(batch['surface_noisy'].device)
+        # print(batch['state_constant'].device)
+        # print(batch['prev_state_surface'].device)
+
         batch['state_surface'] = torch.cat([batch['state_surface']*sel,batch['prev_state_surface']*sel, 
                                    batch['surface_noisy'],batch['state_constant']], dim=1)
   #      print(batch['state_surface'].shape, 'concatenated')
@@ -125,7 +133,7 @@ class SimpleDiffusion(pl.LightningModule):
         bs = batch['state_surface'].shape[0]
 
         timesteps = torch.randint(0, self.noise_scheduler.config.num_train_timesteps, (bs,), device=device).long()
-
+     #   print(timesteps)
         surface_noise = torch.randn_like(batch['next_state_surface'])
         #level_noise = torch.randn_like(batch['next_state_level'])
         batch['surface_noisy'] = self.noise_scheduler.add_noise(batch['next_state_surface'], surface_noise, timesteps)
@@ -170,22 +178,22 @@ class SimpleDiffusion(pl.LightningModule):
 
     def sample_rollout(self, batch, *args, lead_time_months, seed,**kwargs):
         device = batch['state_surface'].device
-        history = dict(state_surface=[])
+        history = dict(state_surface=[],next_state_surface=[])
         next_time = batch['next_time']    
         cur_year_index = int(next_time[0].split('-')[0]) - 1960
         cur_month_index = int(next_time[0].split('-')[-1]) - 1
         inc_time_vec = np.vectorize(inc_time)
-
-
+        history['next_state_surface'].append(batch['next_state_surface'])
+        history['state_surface'].append(batch['state_surface'])
         for i in range(lead_time_months):
             start = time.time()
 
             print(i,'lead_time')
-            sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler='ddpm',seed=seed)
+            sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler='ddpm',seed=100000*seed + i)
 #            print(len(sample))
 #            print(sample)
             #only for delta runs
-            print(sample)
+          #  print(sample)
             next_time = batch['next_time']    
             cur_year_index = int(next_time[0].split('-')[0]) - 1960
             cur_month_index = int(next_time[0].split('-')[-1]) - 1
@@ -195,7 +203,8 @@ class SimpleDiffusion(pl.LightningModule):
             new_state_surface=sample['next_state_surface'].to(device)*torch.unsqueeze(self.dataset.surface_delta_stds,0).to(device) + batch['state_surface'].to(device)
           #  prev_state_surface=sample['state_surface'].to(device)*torch.unsqueeze(self.dataset.surface_delta_stds,0).to(device) + batch['state_surface'].to(device)
             
-            history['state_surface'].append(new_state_surface)
+            history['next_state_surface'].append(new_state_surface)
+            history['state_surface'].append(batch['state_surface'])
 
 #            print(state_surface)
             batch = dict(state_surface=new_state_surface,
@@ -239,7 +248,7 @@ class SimpleDiffusion(pl.LightningModule):
         scheduler.set_timesteps(num_inference_steps)
 
         local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
-        generator = torch.Generator(device=batch['state_surface'].device)
+        generator = torch.Generator(device='cpu')
         generator.manual_seed(seed)
     
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
@@ -256,7 +265,7 @@ class SimpleDiffusion(pl.LightningModule):
             #    current_alpha_t = alpha_prod_t / alpha_prod_t_prev
              #   current_beta_t = 1 - current_alpha_t
                 print(t)
-                print(local_batch['surface_noisy'][0,0,0,:],'next time step')
+              #  print(local_batch['surface_noisy'][0,0,0,:],'next time step')
 
                 #sel = (torch.rand((1,), device='cpu') > self.p_uncond)
                 pred = self.forward(local_batch, torch.tensor([t]).to(self.device))

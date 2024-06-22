@@ -10,7 +10,7 @@ import pandas as pd
 with initialize(version_base=None, config_path="../conf"):
     cfg = compose(config_name="config")
 pl.seed_everything(cfg.experiment.seed)
-
+device = 'cuda'
 val = hydra.utils.instantiate(
     cfg.experiment.val_dataset,
     generate_statistics=False,
@@ -20,12 +20,11 @@ val = hydra.utils.instantiate(
     work_path=cfg.environment.work_path,
     scratch_path=cfg.environment.scratch_path,
 )
-
 val_dataloader = torch.utils.data.DataLoader(
     val,
     batch_size=1,
     shuffle=False,
-    num_workers=0   
+    num_workers=1 ,
 )
 
 #batch = next(iter(train_dataloader))
@@ -35,21 +34,28 @@ model = hydra.utils.instantiate(
         cfg.experiment.backbone,
     ),
     dataset=val_dataloader.dataset
-)
+).to(device)
 
 # x = np.stack(val.timestamps)[:,2]
 # indices = np.stack(val.timestamps)[np.where((pd.to_datetime(x).year == 2001) & (pd.to_datetime(x).month == 1),True,False)][:,[0,1]]
 run_id = '20e12882'
 file_name = 'epoch=45.ckpt'
-#scratch = os.environ['SCRATCH']
-#checkpoint_path = torch.load(f'{scratch}/checkpoint_{run_id}/{file_name}',map_location=torch.device('cuda'))
-checkpoint_path = torch.load(f'epoch=45.ckpt',map_location=torch.device('cpu'))
+scratch = os.environ['SCRATCH']
+checkpoint_path = torch.load(f'{scratch}/checkpoint_{run_id}/{file_name}',map_location=torch.device('cuda'))
+#checkpoint_path = torch.load(f'epoch=45.ckpt',map_location=torch.device('mps'))
 model.load_state_dict(checkpoint_path['state_dict'])
 # trainer.test(model, val_dataloader)
 #inv_map = {v: k for k, v in val.id2pt.items()}
 iter_val = iter(val_dataloader)
 batch = next(iter_val)
+batch['state_surface'] = batch['state_surface'].to(device)
+batch['state_constant']= batch['state_constant'].to(device)
+batch['prev_state_surface'] =batch['prev_state_surface'].to(device)
+batch['next_state_surface'] = batch['next_state_surface'].to(device)
+batch['forcings'] = batch['forcings'].to(device)
+batch['solar_forcings'] = batch['solar_forcings'].to(device)
 
+#batch = {batch[k].to(device) if (k != 'time') and (k != 'next_time') and (k !=  else v  for k, v in batch.items()}
 for i in range(4):
     print(i,'ensemble member')
     # index = inv_map[(indices[i][0],indices[i][1])]
@@ -59,6 +65,6 @@ for i in range(4):
     # batch['next_time'] = [batch['next_time']]
     print(batch['time'])
     #batch = {k: v.unsqueeze(0) if (k != 'time') and (k != 'next_time') else v for k, v in batch.items()}
-    output = model.sample_rollout(batch, lead_time_months=10,seed = i)
+    output = model.sample_rollout(batch, lead_time_months=30,seed = i)
     with open(f'{i}_rollout_cur_state_investigation.pkl','wb') as f:
         pickle.dump(output,f)

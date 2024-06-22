@@ -7,6 +7,8 @@ from lightning.pytorch.callbacks import ModelCheckpoint,TQDMProgressBar
 import submitit
 import os
 from pathlib import Path
+import signal
+
 
 
 
@@ -58,7 +60,7 @@ def train(cfg,run_id):
         train,
         batch_size=cfg.experiment.train_batch_size,
         shuffle=True,
-        num_workers=cfg.experiment.num_cpus_per_task * 2
+        num_workers=cfg.experiment.num_cpus_per_task // 2
     )
     val_dataloader = torch.utils.data.DataLoader(
         val,
@@ -77,11 +79,11 @@ def train(cfg,run_id):
 
     trainer = pl.Trainer(
         max_epochs=cfg.experiment.max_epochs,
-    #    callbacks=[bar,checkpoint_callback,ModelSummary(max_depth=-1)],
+      #  callbacks=[bar,checkpoint_callback,ModelSummary(max_depth=-1)],
         callbacks=[bar,checkpoint_callback],
         enable_checkpointing=True,
         log_every_n_steps=100,
-       # max_steps=cfg.experiment.max_steps if not cfg.debug else 10,
+        max_steps=cfg.experiment.max_steps if not cfg.debug else 10,
         logger=wandb_logger,
         precision="16-mixed",
         profiler='simple' if cfg.debug else None,
@@ -116,12 +118,80 @@ def main(cfg: DictConfig):
 
 #    scratch_dir = os.environ['SCRATCH']
     work_dir = os.environ['WORK']
-   
-    if(cfg.debug):
-        cfg.experiment.train_batch_size = 1
-        cfg.experiment.val_batch_size = 1
-        train(cfg)
-        return
+
+
+
+    
+    # init some variables
+    # logger = None
+    # ckpt_path = None
+    # # delete submitit handler to let PL take care of resuming
+    # signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
+
+    # # first, check if exp exists
+    # if Path(cfg.exp_dir).exists():
+    #     print('Experiment already exists. Trying to resume it.')
+    #     exp_cfg = OmegaConf.load(Path(cfg.exp_dir) / 'config.yaml')
+    #     if cfg.resume:
+    #         cfg = exp_cfg
+    #     else:
+    #         # check that new config and old config match
+    #         if OmegaConf.to_yaml(cfg.module, resolve=True) != OmegaConf.to_yaml(exp_cfg.module):
+    #             print('Module config mismatch. Exiting')
+    #             print('Old config', OmegaConf.to_yaml(exp_cfg.module))
+    #             print('New config', OmegaConf.to_yaml(cfg.module))
+                
+    #         if OmegaConf.to_yaml(cfg.dataloader, resolve=True) != OmegaConf.to_yaml(exp_cfg.dataloader):
+    #             print('Dataloader config mismatch. Exiting.')
+    #             print('Old config', OmegaConf.to_yaml(exp_cfg.dataloader))
+    #             print('New config', OmegaConf.to_yaml(cfg.dataloader))
+    #             return
+            
+    #     # trying to find checkpoints
+    #     ckpt_dir = Path(cfg.exp_dir).joinpath('checkpoints')
+    #     if ckpt_dir.exists():
+    #         ckpts = list(sorted(ckpt_dir.iterdir(), key=os.path.getmtime))
+    #         if len(ckpts):
+    #             print('Found checkpoints', ckpts)
+    #             ckpt_path = ckpts[-1]  
+
+
+    # if cfg.log:
+    #     os.environ['WANDB_DISABLE_SERVICE'] = 'True'
+    #     print('wandb mode', cfg.cluster.wandb_mode)
+    #     print('wandb service', os.environ.get('WANDB_DISABLE_SERVICE', 'variable unset'))
+    #     run_id = cfg.name + '-'+get_random_code() if cfg.cluster.manual_requeue else cfg.name
+    #     logger = pl.loggers.WandbLogger(project=cfg.project,
+    #                                     name=cfg.name,
+    #                                     id=run_id,
+    #                                     save_dir=cfg.cluster.wandb_dir,
+    #                                     offline=(cfg.cluster.wandb_mode != 'online'))
+        
+
+    # if cfg.log and main_node and not Path(cfg.exp_dir).exists():
+    #     print('registering exp on main node')
+    #     hparams = OmegaConf.to_container(cfg, resolve=True)
+    #     print(hparams)
+    #     logger.log_hyperparams(hparams)
+    #     Path(cfg.exp_dir).mkdir(parents=True)
+    #     with open(Path(cfg.exp_dir) / 'config.yaml', 'w') as f:
+    #         f.write(OmegaConf.to_yaml(cfg, resolve=True))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
     log_path = f'{work_dir}/submitit_logs'
     Path(log_path).mkdir(exist_ok=True)
@@ -134,6 +204,7 @@ def main(cfg: DictConfig):
                                  nodes=1, 
                                  gpus_per_node=cfg.experiment.num_gpus, 
                                  slurm_time=cfg.experiment.slurm_time,
+                                 cpus_per_task=cfg.experiment.num_cpus_per_task,
                                  slurm_account="mlr@a100",
                                  slurm_job_name=cfg.experiment.name,
                                  slurm_constraint="a100",

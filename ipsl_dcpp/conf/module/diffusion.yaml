@@ -1,0 +1,37 @@
+
+module:
+  _target_: ipsl_dcpp.model.simple_diffusion.SimpleDiffusion
+  num_diffusion_timesteps: 1000
+  lr: 3e-4
+  weight_decay: 0
+  betas: [0.9, 0.99]
+  num_warmup_steps: 500
+  num_cycles: 0.5
+  num_training_steps: 300000
+  num_inference_steps: 10
+  prediction_type: 'v_prediction'
+  num_ensemble_members: 3
+  p_uncond: 0.2
+
+backbone:
+  _target_: ipsl_dcpp.model.pangu.PanguWeather
+  soil: False
+  plev: False
+  conv_head: True
+  lon_resolution: 144
+  lat_resolution: 143
+  emb_dim: 576
+  cond_dim: 256
+  num_heads: [6, 12, 12, 6]
+  patch_size: [2,2,2]
+  two_poles: False
+  window_size: [1, 6, 12]   #how is this working when surface channel is only one? 
+  depth_multiplier: 2
+  position_embs_dim: 0
+ # surface_ch: 31
+  surface_ch: 28
+  level_ch: 0
+  #level_ch: 8
+  depth_ch: 0
+  use_skip: False
+  delta: False  

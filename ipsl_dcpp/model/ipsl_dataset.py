@@ -39,8 +39,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.files = dict(
                   all_=[str(x) for x in self.files],
             #need to go to only 2004 because atmos forcings only go to 2014
-                  train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1961,1962))])],
-                  val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2000,2004))])],
+                  train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1961,2009))])],
+                  val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2009,2013))])],
                   test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2013,2016))])])[domain]
         #by ensemble member
         # self.files = dict(
