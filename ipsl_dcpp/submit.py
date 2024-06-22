@@ -14,9 +14,9 @@ try:
 except:
     pass
 
-from train_hydra import main as train_main
+from train import main as train_main
 
-@hydra.main(version_base=None, config_path="configs", config_name="config")
+@hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig):
     aex = submitit.AutoExecutor(folder=cfg.cluster.folder, cluster='slurm')
     aex.update_parameters(**cfg.cluster.launcher) # original launcher

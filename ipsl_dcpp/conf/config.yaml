@@ -1,7 +1,7 @@
 defaults:
-  - cluster: local
+  - cluster: jean_zay_v100
   - dataloader: ipsl
-  - module: diffusion
+  - module: diffusion_with_pressure_levels
   - override hydra/launcher: submitit_slurm
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none
@@ -9,7 +9,7 @@ defaults:
   
 #example of override: python run.py environment=cleps
 
-log: False #wandb logging
+log: True #wandb logging
 
 name: ${module.name}
 project: ${module.project}

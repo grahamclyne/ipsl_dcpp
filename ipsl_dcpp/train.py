@@ -245,9 +245,9 @@ def main(cfg: DictConfig):
                                               shuffle=True) 
 
     pl_module = hydra.utils.instantiate(
-        cfg.experiment.module,
-        backbone=hydra.utils.instantiate(cfg.experiment.backbone),
-        dataset=train_dataloader.dataset
+        cfg.module.module,
+        backbone=hydra.utils.instantiate(cfg.module.backbone),
+        dataset=train_loader.dataset
     )
     if hasattr(cfg, 'load_ckpt'):
         # load weights w/o resuming run
@@ -313,7 +313,7 @@ def main(cfg: DictConfig):
                 limit_val_batches=cfg.limit_val_batches, # max 5 samples
                 accumulate_grad_batches=cfg.accumulate_grad_batches,
                 )
-
+    
     if cfg.debug:
         breakpoint()
 
@@ -332,40 +332,40 @@ def main(cfg: DictConfig):
 
 
 
-    log_path = f'{work_dir}/submitit_logs'
-    Path(log_path).mkdir(exist_ok=True)
-    exp_id = len(list(Path(log_path).glob(f'{run_id}_*')))
-    Path(f'{log_path}/{run_id}_{exp_id}').mkdir()
-    aex = submitit.AutoExecutor(folder=f'{log_path}/{run_id}_{exp_id}')
-    if cfg.environment.name == 'jean_zay' and cfg.experiment.gpu_type == 'a100': # run on jean zay a100
-         torch.set_float32_matmul_precision('medium') # can be 'high' too ? 
-         aex.update_parameters(tasks_per_node=cfg.experiment.num_gpus, 
-                                 nodes=1, 
-                                 gpus_per_node=cfg.experiment.num_gpus, 
-                                 slurm_time=cfg.experiment.slurm_time,
-                                 cpus_per_task=cfg.experiment.num_cpus_per_task,
-                                 slurm_account="mlr@a100",
-                                 slurm_job_name=cfg.experiment.name,
-                                 slurm_constraint="a100",
-                                 slurm_qos="qos_gpu-t3",
-                             )
-    elif cfg.environment.name == 'jean_zay' and cfg.experiment.gpu_type == 'v100': # run on jean zay a100
-        aex.update_parameters(tasks_per_node=cfg.experiment.num_gpus, 
-                                 nodes=1, 
-                                 gpus_per_node=cfg.experiment.num_gpus, 
-                                 slurm_time=cfg.experiment.slurm_time,
-                                # cpus_per_task=cfg.experiment.num_cpus_per_task,
-                                 slurm_account="mlr@v100",
-                                 slurm_job_name=cfg.experiment.name,
+    # log_path = f'{work_dir}/submitit_logs'
+    # Path(log_path).mkdir(exist_ok=True)
+    # exp_id = len(list(Path(log_path).glob(f'{run_id}_*')))
+    # Path(f'{log_path}/{run_id}_{exp_id}').mkdir()
+    # aex = submitit.AutoExecutor(folder=f'{log_path}/{run_id}_{exp_id}')
+    # if cfg.environment.name == 'jean_zay' and cfg.experiment.gpu_type == 'a100': # run on jean zay a100
+    #      torch.set_float32_matmul_precision('medium') # can be 'high' too ? 
+    #      aex.update_parameters(tasks_per_node=cfg.experiment.num_gpus, 
+    #                              nodes=1, 
+    #                              gpus_per_node=cfg.experiment.num_gpus, 
+    #                              slurm_time=cfg.experiment.slurm_time,
+    #                              cpus_per_task=cfg.experiment.num_cpus_per_task,
+    #                              slurm_account="mlr@a100",
+    #                              slurm_job_name=cfg.experiment.name,
+    #                              slurm_constraint="a100",
+    #                              slurm_qos="qos_gpu-t3",
+    #                          )
+    # elif cfg.environment.name == 'jean_zay' and cfg.experiment.gpu_type == 'v100': # run on jean zay a100
+    #     aex.update_parameters(tasks_per_node=cfg.experiment.num_gpus, 
+    #                              nodes=1, 
+    #                              gpus_per_node=cfg.experiment.num_gpus, 
+    #                              slurm_time=cfg.experiment.slurm_time,
+    #                             # cpus_per_task=cfg.experiment.num_cpus_per_task,
+    #                              slurm_account="mlr@v100",
+    #                              slurm_job_name=cfg.experiment.name,
 
-                                 #slurm_hint='nomultithread',
+    #                              #slurm_hint='nomultithread',
                                  
-                                 slurm_constraint='v100-32g',
-                                #slurm_use_srun=True,
-                                # slurm_'nomultithread'
-                             )
+    #                              slurm_constraint='v100-32g',
+    #                             #slurm_use_srun=True,
+    #                             # slurm_'nomultithread'
+    #                          )
 
-    aex.submit(train, cfg,run_id)
+    # aex.submit(train, cfg,run_id)
 
 
 if __name__ == "__main__":
