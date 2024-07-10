@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=climatology_generation     # job name
 #SBATCH --ntasks=1                   # number of MP tasks
-#SBATCH --cpus-per-task=8           # number of cores per tasks, see how many GPUs per node and take proportional amount of CPUs
+#SBATCH --cpus-per-task=16           # number of cores per tasks, see how many GPUs per node and take proportional amount of CPUs
 #SBATCH --hint=nomultithread         # we get physical cores not logical
-#SBATCH --time=00:05:00              # maximum execution time (HH:MM:SS)
+#SBATCH --time=02:00:00              # maximum execution time (HH:MM:SS)
 #SBATCH --account=mlr@cpu
 
 

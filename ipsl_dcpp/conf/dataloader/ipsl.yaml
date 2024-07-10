@@ -9,3 +9,5 @@ dataset:
   plev_variables: ${module.plev_variables} 
   work_path: ${cluster.work_path}
   scratch_path: ${cluster.data_path}
+  flattened_plev: ${module.flattened_plev}
+  debug: ${debug}

@@ -5,19 +5,19 @@ wandb_mode: offline
 manual_requeue: True
 
 precision: 16-mixed
-batch_size: 4
 gpus: 2
-cpus: 10
+cpus: 8
 
 folder: ./sblogs/${name}/
 
 launcher:
-    cpus_per_task: ${cluster.cpus} # need 8 to correctly allocate memory even if we use less
+    cpus_per_task: ${cluster.cpus} 
     gpus_per_node: ${cluster.gpus}
     nodes: 1
     tasks_per_node: ${cluster.gpus}
-    timeout_min: 10
+    timeout_min: 1000
     name: ${name}
+  #  slurm_qos: qos_gpu-dev 
     slurm_partition: gpu_p2
     slurm_constraint: v100
     slurm_account: mlr@v100

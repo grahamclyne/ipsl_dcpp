@@ -4,7 +4,7 @@
 #SBATCH --ntasks-per-node=1          # number of MPI tasks per node
 #SBATCH --cpus-per-task=1      # number of cores per tasks
 #SBATCH --hint=nomultithread         # we get physical cores not logical
-#SBATCH --time=16:00:00              # maximum execution time (HH:MM:SS)
+#SBATCH --time=03:00:00              # maximum execution time (HH:MM:SS)
 #SBATCH --account=mlr@cpu
 cd ${WORK}/ipsl_dcpp/ipsl_dcpp
 

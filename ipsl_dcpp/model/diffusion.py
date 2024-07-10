@@ -21,6 +21,13 @@ def inc_time(batch_time):
     return f'{year}-{month}'
 
 
+pressure_levels = torch.tensor([  50,  100,  150,  200,  250,  300,  400,  500,  600,  700,  850,  925,
+       1000]).float()
+surface_coeffs = torch.tensor([0.1, 0.1, 1.0, 0.1])[None, :, None, None, None] # graphcast
+surface_coeffs = torch.tensor([0.25, 0.25, 0.25, 0.25])[None, :, None, None, None] # pangu coeffs
+level_coeffs = (pressure_levels/pressure_levels.mean())[None, None, :, None, None]
+
+
 class Diffusion(pl.LightningModule):
     def __init__(
         self,
@@ -97,6 +104,9 @@ class Diffusion(pl.LightningModule):
 
         batch['state_surface'] = torch.cat([batch['state_surface']*sel,batch['prev_state_surface']*sel, 
                                    batch['surface_noisy'],batch['state_constant']], dim=1)
+        if(self.backbone.plev):
+            batch['state_level'] = torch.cat([batch['state_level']*sel,batch['prev_state_level']*sel, 
+                                   batch['level_noisy']], dim=1)
   #      print(batch['state_surface'].shape, 'concatenated')
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
         month_emb = self.month_embedder(month)
@@ -128,40 +138,43 @@ class Diffusion(pl.LightningModule):
         return out
 
     def training_step(self, batch, batch_nb):
-        # sample timesteps
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
 
         timesteps = torch.randint(0, self.noise_scheduler.config.num_train_timesteps, (bs,), device=device).long()
-     #   print(timesteps)
         surface_noise = torch.randn_like(batch['next_state_surface'])
-        #level_noise = torch.randn_like(batch['next_state_level'])
         batch['surface_noisy'] = self.noise_scheduler.add_noise(batch['next_state_surface'], surface_noise, timesteps)
-        #batch['level_noisy'] = self.noise_scheduler.add_noise(batch['next_state_level'], level_noise, timesteps)
-
         batch['surface_noisy'] = self.noise_scheduler.scale_model_input(batch['surface_noisy'])
-        #batch['level_noisy'] = self.noise_scheduler.scale_model_input(batch['level_noisy'])
+        if(self.backbone.plev):
+            level_noise = troch.randn_like(batch['next_state_level'])
+            batch['level_noisy'] = self.noise_scheduler.add_noise(batch['level_noisy'], level_noise,timesteps)
+            batch['level_noisy'] = self.noise_scheduler.scale_model_input(batch['level_noisy'])
+        
         # Get the target for loss depending on the prediction type
         if self.noise_scheduler.config.prediction_type == "epsilon":
             target_surface = surface_noise
-        #    target_level = level_noise
+           # target_level = level_noise
         elif self.noise_scheduler.config.prediction_type == "v_prediction":
             target_surface = self.noise_scheduler.get_velocity(batch['next_state_surface'], surface_noise, timesteps)
-     #       target_level = self.noise_scheduler.get_velocity(batch['next_state_level'], level_noise, timesteps)
+            if(self.backbone.plev):
+                target_level = self.noise_scheduler.get_velocity(batch['next_state_level'], level_noise, timesteps)
 
         elif self.noise_scheduler.config.prediction_type == "sample":
             target_surface = batch['next_state_surface']
-      #      target_level = batch['next_state_level']
+            target_level = batch['next_state_level']
 
         
         # create uncond
         sel = (torch.rand((bs,), device=device) > self.p_uncond)
         pred = self.forward(batch, timesteps,sel[:,None,None,None])
+        #print(pred['next_state_surface'].shape)
+        #print('prediction',pred['next_state_surface'][0,:,0,0])
         # compute loss
         batch['next_state_surface'] = target_surface
-    #    batch['next_state_level'] = target_level
+        if(self.backbone.plev):
+            batch['next_state_level'] = target_level
 
-        _, _, loss = self.loss(pred, batch)
+        loss = self.loss(pred, batch)
         loss = loss.mean()
         self.mylog(loss=loss)
 
@@ -173,8 +186,22 @@ class Diffusion(pl.LightningModule):
         device = batch['next_state_surface'].device
         mse_surface = (pred['next_state_surface'].squeeze() - batch['next_state_surface'].squeeze()).pow(2)
         mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
-        loss = mse_surface.sum(1).mean((-3, -2, -1))
-        return mse_surface, None, loss
+
+
+
+        if(self.backbone.plev):    
+            mse_level = (pred['next_state_level'].squeeze() - batch['next_state_level'].squeeze()).pow(2)
+            if mse_level.shape[-2] == 128:
+                mse_level = mse_level[..., 4:-4, 8:-8]
+            mse_level = mse_level.mul(lat_coeffs.to(device))
+            mse_level_w = mse_level.mul(level_coeffs.to(device))
+    
+        if(self.backbone.plev):
+            loss = (mse_surface.sum(1).mean((-3, -2, -1)) + 
+                mse_level_w.sum(1).mean((-3, -2, -1)))
+        else:
+            loss = mse_surface.sum(1).mean((-3, -2, -1))
+        return loss
 
     def sample_rollout(self, batch, *args, lead_time_months, seed,**kwargs):
         device = batch['state_surface'].device
@@ -183,30 +210,76 @@ class Diffusion(pl.LightningModule):
         cur_year_index = int(next_time[0].split('-')[0]) - 1960
         cur_month_index = int(next_time[0].split('-')[-1]) - 1
         inc_time_vec = np.vectorize(inc_time)
-        history['next_state_surface'].append(batch['next_state_surface'])
-        history['state_surface'].append(batch['state_surface'])
         for i in range(lead_time_months):
             start = time.time()
-
+           # print(batch['state_surface'].shape)
+            
             print(i,'lead_time')
-            sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler='ddpm',seed=100000*seed + i)
-#            print(len(sample))
-#            print(sample)
-            #only for delta runs
-          #  print(sample)
+            
+            sample,steps = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler='ddim',seed=100000*seed + i)
             next_time = batch['next_time']    
             cur_year_index = int(next_time[0].split('-')[0]) - 1960
             cur_month_index = int(next_time[0].split('-')[-1]) - 1
-            # print(sample['next_state_surface'].shape)
-            # print(batch['state_surface'].shape)
+            new_state_surface=sample['next_state_surface'][:,:10].to(device)*self.dataset.surface_delta_stds.to(device).unsqueeze(0) + batch['state_surface'][:,:10].to(device)
+            assert len(sample['next_state_surface'][:,:10].shape) == len(self.dataset.surface_delta_stds.to(device).unsqueeze(0).shape)
+            # print(sample['next_state_surface'][:,:10].shape)
             # print(self.dataset.surface_delta_stds.shape)
-            new_state_surface=sample['next_state_surface'].to(device)*torch.unsqueeze(self.dataset.surface_delta_stds,0).to(device) + batch['state_surface'].to(device)
+            # print(new_state_surface.shape)
           #  prev_state_surface=sample['state_surface'].to(device)*torch.unsqueeze(self.dataset.surface_delta_stds,0).to(device) + batch['state_surface'].to(device)
+            #need to reshape flattened plev back to level and then un-delta-ize
+            if(self.dataset.flattened_plev):
+                new_state_plev=sample['next_state_surface'][:,10:].to(device)*self.dataset.plev_delta_stds.to(device).unsqueeze(0).reshape(1,8*3,1,1) + batch['state_surface'][:,10:].to(device)
+                # new_state_plev = new_state_plev.reshape(-1,8*3,143,144)
+                # print('plev adjust',sample['next_state_surface'][:,10:].to(device).reshape(-1,8,3,143,144).shape)
+                # print(new_state_plev.shape)
+                # print(new_state_surface.shape)
+                # print(batch['state_surface'].shape)
+                # print(self.dataset.plev_delta_stds.shape)
+                new_state_surface = torch.concatenate([new_state_surface,new_state_plev],axis=1)
+
+
+
+            #visualize denoising proccess
+            from matplotlib import animation
+            import xarray as xr
+            import matplotlib.pyplot as plt
+            ds = xr.open_dataset(self.dataset.files[0])
+            shell = ds.isel(time=0)
+            fig, axes = plt.subplots(1,1, figsize=(16, 6))
+            steps = np.stack([x.cpu() for x in steps])
+            container = []
+            var_num = -1
+            for time_step in range(len(steps)):
+                # print(np.stack(ensembles[0]['state_surface']).shape)
+                # print(np.stack(ipsl_ensemble[0]['state_surface']).shape)
+                shell['tas'].data = steps[time_step][0][var_num]
+               # line = ax1.pcolormesh(steps[time_step][0,0,0])
+                line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=False,vmax=5,vmin=-5)
+                title = axes.text(0.5,1.05,"Diffusion Step {}".format(time_step), 
+                                size=plt.rcParams["axes.titlesize"],
+                                ha="center", transform=axes.transAxes,)
+                axes.set_title('denoise')
+            
+                container.append([line,title])
+            plt.title('')
+            
+            ani = animation.ArtistAnimation(fig, container, interval=200, blit=True)
+            ani.save(f'denoise_{var_num}_{i}_epsilon.gif')
+
+
+            fig, axes = plt.subplots(1,1, figsize=(16, 6))
+            var_num = -1
+            print(sample['next_state_surface'].shape)
+            shell['tas'].data = sample['next_state_surface'][0][var_num].cpu()
+           # line = ax1.pcolormesh(steps[time_step][0,0,0])
+            line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=True,vmax=5,vmin=-5)
+            fig.savefig(f'denoised_image_epsilon__{var_num}_{i}.png')
+
+
+
             
             history['next_state_surface'].append(new_state_surface)
             history['state_surface'].append(batch['state_surface'])
-
-#            print(state_surface)
             batch = dict(state_surface=new_state_surface,
                          prev_state_surface=batch['state_surface'],
                                #state_level=denorm_sample['next_state_level'],
@@ -235,6 +308,7 @@ class Diffusion(pl.LightningModule):
             scheduler = self.noise_scheduler
         elif scheduler == 'ddim':
             from diffusers import DDIMScheduler
+            print('using ddim')
             sched_cfg = self.noise_scheduler.config
             scheduler = DDIMScheduler(num_train_timesteps=sched_cfg.num_train_timesteps,
                                                        beta_schedule=sched_cfg.beta_schedule,
@@ -242,7 +316,14 @@ class Diffusion(pl.LightningModule):
                                                        beta_start=sched_cfg.beta_start,
                                                        beta_end=sched_cfg.beta_end,
                                                        clip_sample=False,
-                                                       clip_sample_range=1e6)
+                                                       clip_sample_range=3.5,
+                                                       rescale_betas_zero_snr=True,
+
+                                               #      rescale_betas_zero_snr=True,
+                                                     #  timestep_spacing='trailing',
+                                                      # thresholding=True,
+                                    #  dynamic_thresholding_ratio=0.70
+                                                     )
             
 
         scheduler.set_timesteps(num_inference_steps)
@@ -252,10 +333,16 @@ class Diffusion(pl.LightningModule):
         generator.manual_seed(seed)
     
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
-        steps = []
         local_batch['surface_noisy'] = surface_noise.to(self.device)
+        print(surface_noise.shape)
+        if(self.backbone.plev):
+            level_noise = torch.randn_like(batch['next_state_level'])
+            local_batch['level_noisy'] = surface_noise.to(self.device)
+
+        steps = []
         with torch.no_grad():
             for t in scheduler.timesteps:
+
               #  prev_t = scheduler.previous_timestep(t)
 
             #    alpha_prod_t = scheduler.alphas_cumprod[t]
@@ -264,31 +351,66 @@ class Diffusion(pl.LightningModule):
             #    beta_prod_t_prev = 1 - alpha_prod_t_prev
             #    current_alpha_t = alpha_prod_t / alpha_prod_t_prev
              #   current_beta_t = 1 - current_alpha_t
-                print(t)
+                # print(t)
               #  print(local_batch['surface_noisy'][0,0,0,:],'next time step')
 
                 #sel = (torch.rand((1,), device='cpu') > self.p_uncond)
                 pred = self.forward(local_batch, torch.tensor([t]).to(self.device))
                 #scheduler step finds the actual output (in this case, the delta) where next_state_surface is the velocity predicted
                 #uses https://github.com/huggingface/diffusers/blob/668e34c6e0019b29c887bcc401c143a7d088cb25/src/diffusers/schedulers/scheduling_ddpm.py#L525
+
+
+                # def remove_outliers(t:torch.Tensor):
+                    
+                #     #REMOVE OUTLIERS
+                #     maximum = torch.quantile(t.reshape(34,-1),0.999,dim=1)
+                #     minimum = torch.quantile(t.reshape(34,-1),0.001,dim=1)
+                #     maximum = maximum.unsqueeze(1).unsqueeze(2).expand(-1,143,144)
+                #     minimum = minimum.unsqueeze(1).unsqueeze(2).expand(-1,143,144)
+                #     t = torch.clamp(t,min=minimum,max=maximum)
+                #     return t
+                
+                # pred['next_state_surface'] = remove_outliers(pred['next_state_surface'])
+
+                
                 local_batch['surface_noisy'] = scheduler.step(pred['next_state_surface'], t, 
                                                             local_batch['surface_noisy'], 
                                                             generator=generator).prev_sample
+                original_sample = scheduler.step(pred['next_state_surface'], t, 
+                                                            local_batch['surface_noisy'], 
+                                                            generator=generator).pred_original_sample
+                # if(self.backbone.plev):
+                #     local_batch['level_noisy'] = scheduler.step(pred['next_state_level'], t, 
+                #                                                 local_batch['level_noisy'], 
+                #                                                 generator=generator).prev_sample
+
+                
+              #  local_batch['surface_noisy'] = remove_outliers(local_batch['surface_noisy'])
+               # steps.append(local_batch['surface_noisy'])
+                steps.append(original_sample)
+              #  print(local_batch['surface_noisy'].shape)
+              #  print(pred['next_state_surface'].shape)
                 #(alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
                # pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
 
                # local_batch['surface_noisy'] = (((alpha_prod_t**0.5) * local_batch['surface_noisy']) - vel) /(beta_prod_t**0.5)
                 #due to the way the model is set up, the state_surface is modified in the forward loop
-                steps.append(local_batch['state_surface'])
-                local_batch['state_surface'] = local_batch['state_surface'][:,:9]
-            
-            sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'])
+                # print('local_batch',local_batch['state_surface'].shape,local_batch['surface_noisy'].shape)
+                if(self.dataset.flattened_plev):
+                    local_batch['state_surface'] = local_batch['state_surface'][:,:34]
+                else:
+                    local_batch['state_surface'] = local_batch['state_surface'][:,:10]
+                # if(self.backbone.plev):
+                #     local_batch['state_level'] = local_batch['state_level'][:,:8]
+                #     sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],next_state_level=local_batch['level_noisy'])
+                #else:
+            sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface']) 
             
         if denormalize:
-            sample,batch = self.dataset.denormalize(sample, batch)
-
+            #sample,batch = self.dataset.denormalize(sample, batch)
+            pass
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
-        return sample
+        return sample,steps
 
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), 

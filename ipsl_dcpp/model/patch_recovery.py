@@ -115,12 +115,12 @@ class PatchRecovery3D(nn.Module):
     
 class PatchRecovery3(nn.Module):
     def __init__(self, 
-        input_dim=None,
-        dim=192,
-        downfactor=4,
-        output_dim=182,
-        soil=True,
-        plev=True
+        input_dim,
+        dim,
+        downfactor,
+        output_dim,
+        soil,
+        plev
         ):
 # input dim equals input_dim*z since we will be flattening stuff ?
         super().__init__()
@@ -156,7 +156,7 @@ class PatchRecovery3(nn.Module):
       #  output = x[:, 135:287].reshape((x.shape[0], 8, 19, *x.shape[-2:]))
       #  output_depth = x[:,287:].reshape((x.shape[0],3,11,*x.shape[-2:]))
       #  print('after',x.shape)
-        output_surface = x[:,:9]
+        output_surface = x[:,:self.output_dim]
         
         if(self.soil):
             output_depth = x[:,91:94].reshape((x.shape[0],3,11,*x.shape[-2:]))

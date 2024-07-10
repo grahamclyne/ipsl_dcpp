@@ -55,11 +55,15 @@ def window_partition(x: torch.Tensor, window_size):
         windows: (B*num_lon, num_pl*num_lat, win_pl, win_lat, win_lon, C)
     """
     B, Pl, Lat, Lon, C = x.shape
+  #  print('window_view',x.shape)
+  #  print(window_size)
     win_pl, win_lat, win_lon = window_size
     x = x.contiguous().view(B, Pl // win_pl, win_pl, Lat // win_lat, win_lat, Lon // win_lon, win_lon, C)
     windows = x.permute(0, 5, 1, 3, 2, 4, 6, 7).contiguous().view(
         -1, (Pl // win_pl) * (Lat // win_lat), win_pl, win_lat, win_lon, C
     )
+   # print(x.shape)
+   # print(windows.shape)
     return windows
 
 

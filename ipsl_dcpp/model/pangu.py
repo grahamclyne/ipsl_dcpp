@@ -80,8 +80,9 @@ class PanguWeather(nn.Module):
         # In addition, three constant masks(the topography mask, land-sea mask and soil type mask)
         #self.zdim = 8 if patch_size[0]==2 else 5 # 5 for patch size 4
         self.soil = soil
+        self.plev = plev
+
         self.zdim = 11 if self.plev else 1
-        
     #    self.zdim = 7 if self.soil else 1
         #this is some off by one error where the padding makes up for the fact that this is in fact 35x36 if i use lat_resolution and lon_resolution
         self.layer1_shape = (self.lon_resolution//self.patch_size[1], self.lon_resolution//self.patch_size[2])
@@ -156,7 +157,7 @@ class PanguWeather(nn.Module):
         # The outputs of the 2nd encoder layer and the 7th decoder layer are concatenated along the channel dimension.
 
         self.emb_dim = emb_dim
-        output_dim = 9
+        output_dim = (self.surface_ch - 1)//3 #one less for land mask and 3 for prev and noise
 
         if conv_head:
             if(self.soil):
@@ -201,6 +202,7 @@ class PanguWeather(nn.Module):
         if(self.plev):
             upper_air = self.plev_patchembed3d(upper_air)
             x = torch.concat([x,upper_air], dim=2)
+        
         B, C, Pl, Lat, Lon = x.shape
         x = x.reshape(B, C, -1).transpose(1, 2)
         x = self.layer1(x,c)
@@ -216,7 +218,6 @@ class PanguWeather(nn.Module):
         x = self.layer4(x,c)
         output = x
         #what is zdim here? output channels
-        
         output = output.transpose(1, 2).reshape(output.shape[0], -1, self.zdim, *self.layer1_shape)
         if not self.conv_head:
             output_surface = output[:, :, 0, :, :]

@@ -5,7 +5,6 @@ wandb_mode: offline
 manual_requeue: True
 
 precision: 16-mixed
-batch_size: 16
 gpus: 2
 cpus: 16
 
@@ -16,7 +15,7 @@ launcher:
     gpus_per_node: ${cluster.gpus}
     nodes: 1
     tasks_per_node: ${cluster.gpus}
-    timeout_min: 10
+    timeout_min: 1200
     name: ${name}
     slurm_partition: gpu_p5
     slurm_constraint: a100

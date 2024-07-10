@@ -18,15 +18,18 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                  delta,
                  normalization,
                  work_path,
-                 scratch_path
+                 scratch_path,
+                 flattened_plev,
+                 debug
                 ):
+        self.flattened_plev = flattened_plev
         self.work = work_path
         self.scratch = scratch_path
         self.delta = delta
         self.surface_variables=surface_variables
         self.depth_variables=depth_variables
         self.plev_variables=plev_variables
-
+        self.debug = debug
         self.domain = domain
         #self.files = list(glob.glob(f'{self.scratch}/*_1.nc'))
         self.files = list(glob.glob(f'{scratch_path}/*.nc'))
@@ -36,27 +39,27 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
         self.lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
        #by year
-        self.files = dict(
-                  all_=[str(x) for x in self.files],
-            #need to go to only 2004 because atmos forcings only go to 2014
-                  train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,2008))])],
-                  val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2009,2013))])],
-                  test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2013,2016))])])[domain]
-        #by ensemble member
         # self.files = dict(
-        #              all_=[str(x) for x in self.files],
-        #              train= [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])],
-        #              val =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(8,10)])],
-        #              test =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(10,11)])])[domain]
-       # [str(x) for x in files if any(substring in x for substring in ["_" + str(x) + '.nc'  for x in range(1,8)])]
+        #           all_=[str(x) for x in self.files],
+        #     #need to go to only 2004 because atmos forcings only go to 2014
+        #           train=[str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(1960,2008))])],
+        #           val = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2009,2013))])],
+        #           test = [str(x) for x in self.files if any(substring in x for substring in [str(x) for x in list(range(2013,2016))])])[domain]
+        #by ensemble member
+        self.files = dict(
+                     all_=[str(x) for x in self.files],
+                      train= [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '_tos_included.nc'  for x in range(1,8)])],
+                      val =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '_tos_included.nc'  for x in range(8,9)])],
+                     #train= [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '_tos_included.nc'  for x in range(1,2)])],
+                    # val =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '_tos_included.nc'  for x in range(8,8)])],
+                     test =  [str(x) for x in  self.files if any(substring in x for substring in ["_" + str(x) + '_tos_included.nc'  for x in range(10,11)])])[domain]
         self.nfiles = len(self.files)
         self.xr_options = dict(engine='netcdf4', cache=True)
         self.lead_time_months = lead_time_months
-        print(self.files)
        # temp = xr.open_dataset(self.files[0])
         #stats_variable_subset = [list(temp.keys()).index(var) for var in surface_variables]
         #print(stats_variable_subset)
-        variable_subset = [50, 87, 88, 89, 6, 25, 13, 14, 34]
+        #variable_subset = [50, 87, 88, 89, 6, 25, 13, 14, 34,-1]
         self.land_mask = np.expand_dims(np.load(f'{self.work}/data/land_mask.npy'),axis=(0))
        # self.surface_means = np.expand_dims(np.load(f'{self.work}/data/single_var_surface_means.npy'),axis=(0,1))
        # self.surface_stds = np.expand_dims(np.load(f'{self.work}/data/single_var_surface_stds.npy'),axis=(0,1))
@@ -66,17 +69,19 @@ class IPSL_DCPP(torch.utils.data.Dataset):
      #   self.depth_stds = np.broadcast_to(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/climatology_depth_stds.npy'),axis=(-1,-2,-5)),(-1,-2)),(12,3,11,143,144))
         
         if(self.normalization == 'climatology'):
-            self.surface_means = np.load(f'{self.work}/data/climatology_surface_means.npy')[:,variable_subset]
-            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_surface_stds.npy'),(-2,-1)),(12,91,143,144))[:,variable_subset]
+            #self.surface_means = np.load(f'{self.work}/data/climatology_surface_means.npy')
+            self.surface_means = np.load(f'{self.work}/data/climatology_surface_means_ensemble_split.npy')
+
+            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_surface_stds_ensemble_split.npy'),(-2,-1)),(12,len(surface_variables),143,144))
             #self.depth_means = np.load(f'{self.work}/data/climatology_depth_means.npy')
            # self.depth_stds = np.load(f'{self.work}/data/climatology_depth_stds.npy')[:,0]
             #self.depth_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_depth_stds.npy'),(-2,-1)),(12,3,11,143,144))
-            self.plev_means = np.load(f'{self.work}/data/climatology_plev_means.npy')
+            self.plev_means = np.load(f'{self.work}/data/climatology_plev_means_ensemble_split.npy')
            # self.depth_stds = np.load(f'{self.work}/data/climatology_depth_stds.npy')[:,0]
-            self.plev_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_plev_stds.npy'),(-2,-1)),(12,8,19,143,144))
+            self.plev_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_plev_stds_ensemble_split.npy'),(-2,-1)),(12,8,3,143,144))
         elif (self.normalization == 'normal'):
-            self.surface_means = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/surface_means.npy'),(-2,-1)),(91,143,144))[6]
-            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/surface_stds.npy'),(-2,-1)),(91,143,144))[6]
+            self.surface_means = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/surface_means.npy'),(-2,-1)),(9,143,144))[6]
+            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/surface_stds.npy'),(-2,-1)),(9,143,144))[6]
           #  self.depth_means = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/depth_means.npy'),(-3,-2,-1)),(3,11,143,144))
            # self.depth_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/depth_stds.npy'),(-3,-2,-1)),(3,11,143,144))
         elif(self.normalization == 'spatial_normal'):
@@ -86,10 +91,10 @@ class IPSL_DCPP(torch.utils.data.Dataset):
            # print(self.surface_stds.shape)
             self.depth_means = np.load(f'{self.work}/data/spatial_depth_means.npy').squeeze()
             self.depth_stds = np.nanmean(np.load(f'{self.work}/data/spatial_depth_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
-        self.surface_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/surface_delta_std.npy'),axis=(-1,-2)),axis=(-1,-2))[variable_subset])
-        self.depth_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/depth_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2)))
-      #  self.plev_delta_stds = np.expand_dims(np.nanmean(np.load(f'{self.work}/data/plev_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2))
-        self.plev_delta_stds = np.ones([8,19,143,144])
+        self.surface_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/surface_delta_std_ensemble_split.npy'),axis=(-1,-2)),axis=(-1,-2)))[:10]
+        self.plev_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/plev_delta_std_ensemble_split.npy'),axis=(-1,-2)),axis=(0,-1,-2))).reshape(8,3,1,1)
+     #   self.depth_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/depth_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2)))
+      #  self.plev_delta_stds = np.ones([8,19,143,144])
         # self.atmos_forcings = np.load(f'{self.work}/data/atmos_forcings.npy')
         # self.solar_forcings = np.load(f'{self.work}/data/solar_forcings.npy')
         self.atmos_forcings = np.load(f'{self.work}/data/ssp_585_full_atmos.npy')
@@ -103,10 +108,6 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.generate_statistics=generate_statistics
         self.timestamps = []
         self.id2pt_path = f'{self.work}/data/{domain}_id2pt.pkl'
-        # if os.path.exists(self.id2pt_path):
-        #     with open(self.id2pt_path, 'rb') as handle:
-        #         self.id2pt = pickle.load(handle)
-        # else:
         for fid, f in tqdm(enumerate(self.files)):
             with xr.open_dataset(f, **self.xr_options) as obs:
                 var_id = f.split('.')[0][-1]
@@ -117,6 +118,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                 else:
                     self.timestamps.extend(file_stamps[:-((self.lead_time_months)+1)])
                 #self.timestamps.extend(file_stamps)
+            if(self.debug): #just get one file
+                break
         self.timestamps = sorted(self.timestamps, key=lambda x: x[-1]) # sort by timestamp
         self.id2pt = {i:(file_id, line_id) for (i, (file_id, line_id, var_id,s)) in enumerate(self.timestamps)}
         with open(self.id2pt_path, 'wb') as handle:
@@ -128,6 +131,9 @@ class IPSL_DCPP(torch.utils.data.Dataset):
     def xarr_to_tensor(self, obsi,variables):
         if(len(variables) == 0):
             return []
+
+      #  obsi = obsi.sel(plev=[3000,2000,1000,500,100])   
+        obsi = obsi.sel(plev=[85000,70000,50000])#not in hpa, in pa
         data_np = obsi[variables].to_array().to_numpy()
         data_th = torch.from_numpy(data_np)
         return data_th
@@ -138,16 +144,17 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         prev_surface_variables = self.xarr_to_tensor(clim, list(self.surface_variables))
         prev_plev_variables = self.xarr_to_tensor(clim,list(self.plev_variables))
        # prev_depth_variables = self.xarr_to_tensor(clim,list(self.depth_variables))
-        
 
         input_surface_variables = self.xarr_to_tensor(clim, list(self.surface_variables))
         input_plev_variables = self.xarr_to_tensor(clim,list(self.plev_variables))
        # input_depth_variables = self.xarr_to_tensor(clim,list(self.depth_variables))
-        
 
         target_surface_variables = self.xarr_to_tensor(clim_next, list(self.surface_variables))
         target_plev_variables = self.xarr_to_tensor(clim_next,list(self.plev_variables))
-     #   target_depth_variables = self.xarr_to_tensor(clim_next,list(self.depth_variables))
+       # target_depth_variables = self.xarr_to_tensor(clim_next,list(self.depth_variables))
+
+        
+
         prev_time = prev_clim.time.dt.strftime('%Y-%m').item()
 
         time = clim.time.dt.strftime('%Y-%m').item()
@@ -155,9 +162,10 @@ class IPSL_DCPP(torch.utils.data.Dataset):
 
         prev_month_index = int(prev_time.split('-')[-1]) - 1        
         cur_month_index = int(time.split('-')[-1]) - 1
-
-        next_month_index = int(next_time.split('-')[-1]) - 1 
-
+        
+        next_month_index = int(next_time.split('-')[-1]) - 1
+    #    print(next_time)
+   #     print(time)
        # prev_year_index = int(prev_time.split('-')[0]) - 1960
         cur_year_index = int(time.split('-')[0]) - 1960
        # next_year_index = int(next_time.split('-')[0]) - 1960
@@ -169,15 +177,19 @@ class IPSL_DCPP(torch.utils.data.Dataset):
      #   print(input_plev_variables.shape,'dataloader')
         if(not self.generate_statistics):
             if(self.normalization == 'climatology'):
+                
+                prev_plev_variables = (prev_plev_variables - self.plev_means[cur_month_index]) / (self.plev_stds[cur_month_index])
                 prev_surface_variables = (prev_surface_variables - self.surface_means[prev_month_index]) / (self.surface_stds[prev_month_index])
                 input_surface_variables = (input_surface_variables - self.surface_means[cur_month_index]) / (self.surface_stds[cur_month_index])
            #     input_depth_variables = (input_depth_variables - self.depth_means[cur_month_index]) / (self.depth_stds[cur_month_index])
-               # input_plev_variables = (input_plev_variables - self.plev_means[cur_month_index]) / (self.plev_stds[cur_month_index])
-
+            #    print(target_surface_variables.shape)
+                
+                input_plev_variables = (input_plev_variables - self.plev_means[cur_month_index]) / (self.plev_stds[cur_month_index])
+           #     print(next_month_index,'next_month_index')
                 target_surface_variables = (target_surface_variables - self.surface_means[next_month_index]) / (self.surface_stds[next_month_index])
              #   target_depth_variables = (target_depth_variables - self.depth_means[next_month_index]) / (self.depth_stds[next_month_index])
-               # target_plev_variables = (target_plev_variables - self.plev_means[cur_month_index]) / (self.plev_stds[cur_month_index])
-
+                target_plev_variables = (target_plev_variables - self.plev_means[cur_month_index]) / (self.plev_stds[cur_month_index])
+            #    print(target_surface_variables.shape)
             elif(self.normalization == 'normal' or self.normalization == 'spatial_normal'):
                 input_surface_variables = (input_surface_variables - self.surface_means) / self.surface_stds
             #    input_depth_variables = (input_depth_variables - self.depth_means) / self.depth_stds
@@ -191,35 +203,62 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                #target_surface_variables = (target_surface_variables[surface_mask] - input_surface_variables[surface_mask]) / (self.surface_delta_stds[surface_mask])
             #target_depth_variables = (target_depth_variables[depth_mask] - input_depth_variables[depth_mask]) / (self.depth_delta_stds[depth_mask])
                 target_plev_variables = (target_plev_variables - input_plev_variables) / self.plev_delta_stds
+            ##    print(input_surface_variables.shape)
+             #   print(target_surface_variables.shape)
                 target_surface_variables = (target_surface_variables - input_surface_variables) / self.surface_delta_stds
+             #   print(self.surface_delta_stds.shape)
              #   target_depth_variables = (target_depth_variables - input_depth_variables) / self.depth_delta_stds
-            
+             #   print('after delta',target_surface_variables.shape)
+            if(self.flattened_plev and not self.generate_statistics):
+                v,c,l,w = prev_plev_variables.shape
+                prev_plev_variables = prev_plev_variables.reshape(v*c,l,w)
+                prev_surface_variables = torch.concatenate([prev_surface_variables,prev_plev_variables],axis=0)
+                input_plev_variables = input_plev_variables.reshape(v*c,l,w)
+                input_surface_variables = torch.concatenate([input_surface_variables,input_plev_variables],axis=0)
+                target_plev_variables = target_plev_variables.reshape(v*c,l,w)
+                target_surface_variables = torch.concatenate([target_surface_variables,target_plev_variables],axis=0)
+
             input_surface_variables = torch.nan_to_num(input_surface_variables,0)
             input_plev_variables = torch.nan_to_num(input_plev_variables,0)
            # input_depth_variables = torch.nan_to_num(input_depth_variables,0)
             target_surface_variables = torch.nan_to_num(target_surface_variables,0)
             prev_surface_variables = torch.nan_to_num(prev_surface_variables,0)
-
             target_plev_variables = torch.nan_to_num(target_plev_variables,0)
             prev_plev_variables = torch.nan_to_num(prev_plev_variables,0)
-
           #  target_depth_variables = torch.nan_to_num(target_depth_variables,0)
+
+
+        #REMOVE OUTLIERS
+        # maximum = torch.quantile(input_surface_variables.reshape(34,-1),0.999,dim=1).to(batch['state_surface'].device)
+        # minimum = torch.quantile(input_surface_variables.reshape(34,-1),0.001,dim=1).to(batch['state_surface'].device)
+        # maximum = maximum.unsqueeze(1).unsqueeze(2).expand(-1,143,144).unsqueeze(0)
+        # minimum = minimum.unsqueeze(1).unsqueeze(2).expand(-1,143,144).unsqueeze(0)
+        # input_surface_variables = torch.clamp(input_surface_variables,min=minimum,max=maximum)
+
+        
+        # def remove_outliers(t:torch.Tensor):
+            
+        #     #REMOVE OUTLIERS
+        #     maximum = torch.quantile(t.reshape(34,-1),0.99,dim=1)
+        #     minimum = torch.quantile(t.reshape(34,-1),0.01,dim=1)
+        #     maximum = maximum.unsqueeze(1).unsqueeze(2).expand(-1,143,144)
+        #     minimum = minimum.unsqueeze(1).unsqueeze(2).expand(-1,143,144)
+        #     t = torch.clamp(t,min=minimum,max=maximum)
+        #     return t
+
+        # input_surface_variables = remove_outliers(input_surface_variables)
+        # prev_surface_variables = remove_outliers(prev_surface_variables)
+        # target_surface_variables = remove_outliers(target_surface_variables)
+
+        
         out.update(dict(
-                    # state_surface=input_surface_variables.astype(np.float32),
-                    # state_level=input_plev_variables.astype(np.float32),
-                    # state_depth=input_depth_variables.astype(np.float32),
-                    # state_constant=self.land_mask.astype(np.float32),
-                    # next_state_surface=target_surface_variables.astype(np.float32),
-                    # next_state_level=target_plev_variables.astype(np.float32),
-                    # next_state_depth=target_depth_variables.astype(np.float32),
                     prev_state_surface=prev_surface_variables,
                     prev_state_level=prev_plev_variables,
-
                     state_surface=input_surface_variables,
                     state_level=input_plev_variables,
                 #    state_depth=input_depth_variables.type(torch.float32),
                    # state_constant=self.land_mask.astype(np.float32),
-            state_constant=self.land_mask.astype(np.float32),
+                    state_constant=self.land_mask.astype(np.float32),
                     next_state_surface=target_surface_variables,
                     next_state_level=target_plev_variables,
                 #    next_state_depth=target_depth_variables.type(torch.float32),
@@ -231,44 +270,21 @@ class IPSL_DCPP(torch.utils.data.Dataset):
 
     
     def denormalize(self, batch):
-        
         device = batch['next_state_surface'].device
         cur_month = int(batch['time'][0].split('-')[-1]) - 1     
         next_month = int(batch['next_time'][0].split('-')[-1]) - 1    
-        #   denorm_level = lambda x: x.to(device)*torch.from_numpy(self.plev_stds).to(device) + torch.from_numpy(self.plev_means).to(device)
         if(self.delta):
-            batch['next_state_surface'] = ((batch['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
-          #  pred['next_state_surface'] = ((pred['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
-
-    #        if(pred != None):
-    #            pred['next_state_surface'] = pred['next_state_surface']*self.surface_delta_stds + batch['state_surface']
-    #            pred['next_state_depth'] = pred['next_state_depth']*self.depth_delta_stds + batch['state_depth']
-    #        batch['next_state_surface'] = batch['next_state_surface']*self.surface_delta_stds + batch['state_surface']
-    #        batch['next_state_depth'] = batch['next_state_depth']*self.depth_delta_stds + batch['state_depth']
+            undeltaed_next = ((batch['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
         if(self.normalization == 'climatology'):
             denorm_surface = lambda x,month_index: x.to(device)*torch.from_numpy(self.surface_stds[month_index]).to(device) + torch.from_numpy(self.surface_means[month_index]).to(device)
-      #      if(self.soil):
-       #         denorm_depth = lambda x,month_index: x.to(device)*torch.from_numpy(self.depth_stds[month_index]).to(device) + torch.from_numpy(self.depth_means[month_index]).to(device)
-            
         elif(self.normalization == 'normal' or self.normalization == 'spatial_normal'):
             denorm_surface = lambda x,month_index: x.squeeze().to(device)*torch.from_numpy(self.surface_stds).to(device) + torch.from_numpy(self.surface_means).to(device)
-        #    denorm_depth = lambda x,month_index: x.squeeze().to(device)*torch.from_numpy(self.depth_stds).to(device) + torch.from_numpy(self.depth_means).to(device)    
-            
-        # if(pred != None):
-        #     pred = dict(#next_state_level=denorm_level(pred['next_state_level']),
-        #                 next_state_surface=torch.where(self.var_mask.to(device),denorm_surface(pred['next_state_surface'],next_month),torch.nan),
-        #        #         next_state_depth=denorm_depth(pred['next_state_depth'],next_month),
-        #     )
-
-        batch = dict(#next_state_level=denorm_level(batch['next_state_level']),
-                    next_state_surface=torch.where(self.var_mask.to(device),denorm_surface(batch['next_state_surface'],next_month),torch.nan),
-           #          next_state_depth=denorm_depth(batch['next_state_depth'],next_month),
-            #          state_depth=denorm_depth(batch['state_depth'],next_month),
+        batch = dict(
+                    next_state_surface=torch.where(self.var_mask.to(device),denorm_surface(undeltaed_next,next_month),torch.nan),
                     state_constant=batch['state_constant'],
                     state_surface=torch.where(self.var_mask.to(device)==1,denorm_surface(batch['state_surface'],cur_month),torch.nan),
                     time=batch['time'],
         next_time=batch['next_time'])
-
         return batch
 
     
