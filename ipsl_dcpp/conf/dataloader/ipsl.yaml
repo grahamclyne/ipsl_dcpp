@@ -7,7 +7,6 @@ dataset:
   surface_variables: ${module.surface_variables} 
   depth_variables: ${module.depth_variables} 
   plev_variables: ${module.plev_variables} 
-  work_path: ${cluster.work_path}
-  scratch_path: ${cluster.data_path}
+  data_path: ${cluster.data_path}
   flattened_plev: ${module.flattened_plev}
   debug: ${debug}

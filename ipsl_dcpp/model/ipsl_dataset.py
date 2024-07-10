@@ -17,25 +17,21 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                  plev_variables,
                  delta,
                  normalization,
-                 work_path,
-                 scratch_path,
+                 data_path,
                  flattened_plev,
                  debug
                 ):
         self.flattened_plev = flattened_plev
-        self.work = work_path
-        self.scratch = scratch_path
+        self.data_path = data_path
         self.delta = delta
         self.surface_variables=surface_variables
         self.depth_variables=depth_variables
         self.plev_variables=plev_variables
         self.debug = debug
         self.domain = domain
-        #self.files = list(glob.glob(f'{self.scratch}/*_1.nc'))
-        self.files = list(glob.glob(f'{scratch_path}/*.nc'))
+        self.files = list(glob.glob(f'{self.data_path}/batch_with_tos/*.nc'))
         self.normalization = normalization
-        self.var_mask = torch.from_numpy(np.load(f'{self.work}/data/land_mask.npy'))
-   #     self.files = list(glob.glob(f'{self.scratch}/1970*.nc'))
+        self.var_mask = torch.from_numpy(np.load(f'{self.data_path}/reference_data/land_mask.npy'))
         lat_coeffs_equi = torch.tensor([torch.cos(x) for x in torch.arange(-torch.pi/2, torch.pi/2, torch.pi/143)])
         self.lat_coeffs_equi =  (lat_coeffs_equi/lat_coeffs_equi.mean())[None, None, None, :, None]
        #by year
@@ -60,7 +56,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         #stats_variable_subset = [list(temp.keys()).index(var) for var in surface_variables]
         #print(stats_variable_subset)
         #variable_subset = [50, 87, 88, 89, 6, 25, 13, 14, 34,-1]
-        self.land_mask = np.expand_dims(np.load(f'{self.work}/data/land_mask.npy'),axis=(0))
+        self.land_mask = np.expand_dims(np.load(f'{self.data_path}/reference_data/land_mask.npy'),axis=(0))
        # self.surface_means = np.expand_dims(np.load(f'{self.work}/data/single_var_surface_means.npy'),axis=(0,1))
        # self.surface_stds = np.expand_dims(np.load(f'{self.work}/data/single_var_surface_stds.npy'),axis=(0,1))
      #   self.surface_means = np.broadcast_to(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/climatology_surface_means.npy'),axis=(-1,-2,-4)),(-1,-2)),(12,91,143,144))
@@ -70,35 +66,35 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         
         if(self.normalization == 'climatology'):
             #self.surface_means = np.load(f'{self.work}/data/climatology_surface_means.npy')
-            self.surface_means = np.load(f'{self.work}/data/climatology_surface_means_ensemble_split.npy')
+            self.surface_means = np.load(f'{self.data_path}/reference_data/climatology_surface_means_ensemble_split.npy')
 
-            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_surface_stds_ensemble_split.npy'),(-2,-1)),(12,len(surface_variables),143,144))
+            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/climatology_surface_stds_ensemble_split.npy'),(-2,-1)),(12,len(surface_variables),143,144))
             #self.depth_means = np.load(f'{self.work}/data/climatology_depth_means.npy')
            # self.depth_stds = np.load(f'{self.work}/data/climatology_depth_stds.npy')[:,0]
             #self.depth_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_depth_stds.npy'),(-2,-1)),(12,3,11,143,144))
-            self.plev_means = np.load(f'{self.work}/data/climatology_plev_means_ensemble_split.npy')
+            self.plev_means = np.load(f'{self.data_path}/reference_data/climatology_plev_means_ensemble_split.npy')
            # self.depth_stds = np.load(f'{self.work}/data/climatology_depth_stds.npy')[:,0]
-            self.plev_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_plev_stds_ensemble_split.npy'),(-2,-1)),(12,8,3,143,144))
+            self.plev_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/climatology_plev_stds_ensemble_split.npy'),(-2,-1)),(12,8,3,143,144))
         elif (self.normalization == 'normal'):
-            self.surface_means = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/surface_means.npy'),(-2,-1)),(9,143,144))[6]
-            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/surface_stds.npy'),(-2,-1)),(9,143,144))[6]
+            self.surface_means = np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/surface_means.npy'),(-2,-1)),(9,143,144))[6]
+            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/surface_stds.npy'),(-2,-1)),(9,143,144))[6]
           #  self.depth_means = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/depth_means.npy'),(-3,-2,-1)),(3,11,143,144))
            # self.depth_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/depth_stds.npy'),(-3,-2,-1)),(3,11,143,144))
         elif(self.normalization == 'spatial_normal'):
-            self.surface_means = np.load(f'{self.work}/data/spatial_multi_var_surface_means.npy').squeeze()[variable_subset]
+            self.surface_means = np.load(f'{self.data_path}/reference_data/spatial_multi_var_surface_means.npy').squeeze()[variable_subset]
             #print(self.surface_means.shape)
-            self.surface_stds = np.nanmean(np.load(f'{self.work}/data/spatial_multi_var_surface_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)[variable_subset]
+            self.surface_stds = np.nanmean(np.load(f'{self.data_path}/reference_data/spatial_multi_var_surface_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)[variable_subset]
            # print(self.surface_stds.shape)
-            self.depth_means = np.load(f'{self.work}/data/spatial_depth_means.npy').squeeze()
-            self.depth_stds = np.nanmean(np.load(f'{self.work}/data/spatial_depth_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
-        self.surface_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/surface_delta_std_ensemble_split.npy'),axis=(-1,-2)),axis=(-1,-2)))[:10]
-        self.plev_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/plev_delta_std_ensemble_split.npy'),axis=(-1,-2)),axis=(0,-1,-2))).reshape(8,3,1,1)
+            self.depth_means = np.load(f'{self.data_path}/reference_data/spatial_depth_means.npy').squeeze()
+            self.depth_stds = np.nanmean(np.load(f'{self.data_path}/reference_data/spatial_depth_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
+        self.surface_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.data_path}/reference_data/surface_delta_std_ensemble_split.npy'),axis=(-1,-2)),axis=(-1,-2)))[:10]
+        self.plev_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.data_path}/reference_data/plev_delta_std_ensemble_split.npy'),axis=(-1,-2)),axis=(0,-1,-2))).reshape(8,3,1,1)
      #   self.depth_delta_stds = torch.Tensor(np.expand_dims(np.nanmean(np.load(f'{self.work}/data/depth_delta_std.npy'),axis=(-1,-2)),axis=(0,-1,-2)))
       #  self.plev_delta_stds = np.ones([8,19,143,144])
         # self.atmos_forcings = np.load(f'{self.work}/data/atmos_forcings.npy')
         # self.solar_forcings = np.load(f'{self.work}/data/solar_forcings.npy')
-        self.atmos_forcings = np.load(f'{self.work}/data/ssp_585_full_atmos.npy')
-        self.solar_forcings = np.load(f'{self.work}/data/full_solar.npy')
+        self.atmos_forcings = np.load(f'{self.data_path}/reference_data/ssp_585_full_atmos.npy')
+        self.solar_forcings = np.load(f'{self.data_path}/reference_data/full_solar.npy')
         self.atmos_forcings = (self.atmos_forcings - self.atmos_forcings.mean(axis=1,keepdims=True)) / self.atmos_forcings.std(axis=1,keepdims=True)
         self.solar_forcings = (self.solar_forcings - self.solar_forcings.mean(axis=(0,1),keepdims=True)) / self.solar_forcings.std(axis=(0,1),keepdims=True)
         #self.plev_means = np.expand_dims(np.load(f'{self.work}/ipsl_dcpp/data/plev_means.npy'),axis=(1,2,3))
@@ -107,7 +103,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
       #  self.plev_stds = np.ones([8,19,143,144])
         self.generate_statistics=generate_statistics
         self.timestamps = []
-        self.id2pt_path = f'{self.work}/data/{domain}_id2pt.pkl'
+        self.id2pt_path = f'{self.data_path}/reference_data/{domain}_id2pt.pkl'
         for fid, f in tqdm(enumerate(self.files)):
             with xr.open_dataset(f, **self.xr_options) as obs:
                 var_id = f.split('.')[0][-1]
