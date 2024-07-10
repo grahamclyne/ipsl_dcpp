@@ -325,8 +325,9 @@ def main(cfg: DictConfig):
                 accumulate_grad_batches=cfg.accumulate_grad_batches,
                 logger=logger,
                 plugins=[],
-                limit_val_batches=cfg.limit_val_batches, # max 5 samples
-                limit_train_batches=0.1 if cfg.debug else 1
+                limit_val_batches=1,
+              #  limit_val_batches=cfg.limit_val_batches, # max 5 samples
+               # limit_train_batches=0.1 if cfg.debug else 1
                 )
     
     if cfg.debug:
