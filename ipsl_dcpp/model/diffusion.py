@@ -2,6 +2,7 @@
 import lightning.pytorch as pl
 import diffusers
 import torch
+import wandb
 from ipsl_dcpp.model.pangu import TimestepEmbedder
 from ipsl_dcpp.evaluation.metrics import EnsembleMetrics
 import datetime
@@ -27,6 +28,22 @@ surface_coeffs = torch.tensor([0.1, 0.1, 1.0, 0.1])[None, :, None, None, None] #
 surface_coeffs = torch.tensor([0.25, 0.25, 0.25, 0.25])[None, :, None, None, None] # pangu coeffs
 level_coeffs = (pressure_levels/pressure_levels.mean())[None, None, :, None, None]
 
+def bw_to_bwr(bw_tensor, m=None, M=None):
+    x = bw_tensor
+    if m is None:
+        x = x - x.min()
+        x = x / x.max()
+    else:
+        x = (x - m) / (M - m)
+    red = torch.tensor([1, 0, 0])[:, None, None].to(x.device)
+    white = torch.tensor([1, 1, 1])[:, None, None].to(x.device)
+    blue = torch.tensor([0, 0, 1])[:, None, None].to(x.device)
+    x_blue = blue + 2*x*(white-blue)
+    x_red = white + (2*x - 1)*(red-white)
+    x_bwr = x_blue * (x < 0.5) + x_red * (x >= 0.5)
+    x_bwr = (x_bwr * 255).int().permute((1, 2, 0))
+    x_bwr = x_bwr.cpu().numpy().astype('uint8')
+    return x_bwr
 
 class Diffusion(pl.LightningModule):
     def __init__(
@@ -180,6 +197,30 @@ class Diffusion(pl.LightningModule):
 
         return loss
 
+    def validation_step(self, batch, batch_nb):        
+        # for the validation, we make some generations and log them 
+        samples = [self.sample(batch, num_inference_steps=self.num_inference_steps, 
+                                denormalize=False, 
+                                scheduler='ddim', 
+                                seed = j)
+                            for j in range(self.num_members)]
+        denorm_samples = [self.dataset.denormalize(x) for x in samples]
+        denorm_batch = self.dataset.denormalize(batch)
+        #tas_image = wandb.Image(samples[0]['state_surface'][0,0], caption="tas")
+        images = [bw_to_bwr(x['state_surface'][0,0]) for x in samples]
+        self.logger.log_image('tas_image',images=images)
+        
+        self.metrics.update(denorm_batch,denorm_samples)
+        return None
+
+    def on_validation_epoch_end(self):
+        for metric in [self.metrics]:
+            out = metric.compute()
+            self.log_dict(out)# dont put on_epoch = True here
+            print(out)
+            metric.reset()
+
+    
     def loss(self, pred, batch, lat_coeffs=None):
         if lat_coeffs is None:
             lat_coeffs = self.dataset.lat_coeffs_equi
@@ -334,7 +375,6 @@ class Diffusion(pl.LightningModule):
     
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
         local_batch['surface_noisy'] = surface_noise.to(self.device)
-        print(surface_noise.shape)
         if(self.backbone.plev):
             level_noise = torch.randn_like(batch['next_state_level'])
             local_batch['level_noisy'] = surface_noise.to(self.device)
@@ -404,13 +444,13 @@ class Diffusion(pl.LightningModule):
                 #     local_batch['state_level'] = local_batch['state_level'][:,:8]
                 #     sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],next_state_level=local_batch['level_noisy'])
                 #else:
-            sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface']) 
+            sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],time=batch['time'],next_time=batch['next_time']) 
             
         if denormalize:
             #sample,batch = self.dataset.denormalize(sample, batch)
             pass
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
-        return sample,steps
+        return sample
 
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), 

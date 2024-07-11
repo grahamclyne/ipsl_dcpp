@@ -270,17 +270,23 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         cur_month = int(batch['time'][0].split('-')[-1]) - 1     
         next_month = int(batch['next_time'][0].split('-')[-1]) - 1    
         if(self.delta):
-            undeltaed_next = ((batch['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
+           # new_state_surface = ((batch['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
+            new_state_surface=batch['next_state_surface'][:,:10].to(device)*self.surface_delta_stds.to(device).unsqueeze(0) + batch['state_surface'][:,:10].to(device)
+            if(self.flattened_plev):
+                new_state_plev=batch['next_state_surface'][:,10:].to(device)*self.plev_delta_stds.to(device).unsqueeze(0).reshape(1,8*3,1,1) + batch['state_surface'][:,10:].to(device)
+                new_state_surface = torch.concatenate([new_state_surface,new_state_plev],axis=1)
+
         if(self.normalization == 'climatology'):
-            denorm_surface = lambda x,month_index: x.to(device)*torch.from_numpy(self.surface_stds[month_index]).to(device) + torch.from_numpy(self.surface_means[month_index]).to(device)
+            denorm_surface = lambda x,month_index: x[:,:10]*torch.from_numpy(self.surface_stds[month_index]).to(device) + torch.from_numpy(self.surface_means[month_index]).to(device)
+            denorm_plev = lambda x,month_index: x[:,10:]*torch.from_numpy(self.plev_stds[month_index]).to(device).reshape(-1,8*3,143,144) + torch.from_numpy(self.plev_means[month_index]).to(device).reshape(-1,8*3,143,144)
+           # denorm_surface = lambda x,month_index: x.to(device)*torch.from_numpy(self.surface_stds[month_index]).to(device) + torch.from_numpy(self.surface_means[month_index]).to(device)
         elif(self.normalization == 'normal' or self.normalization == 'spatial_normal'):
             denorm_surface = lambda x,month_index: x.squeeze().to(device)*torch.from_numpy(self.surface_stds).to(device) + torch.from_numpy(self.surface_means).to(device)
         batch = dict(
-                    next_state_surface=torch.where(self.var_mask.to(device),denorm_surface(undeltaed_next,next_month),torch.nan),
-                    state_constant=batch['state_constant'],
-                    state_surface=torch.where(self.var_mask.to(device)==1,denorm_surface(batch['state_surface'],cur_month),torch.nan),
-                    time=batch['time'],
-        next_time=batch['next_time'])
+                    next_state_surface=torch.concatenate([denorm_surface(new_state_surface,next_month),denorm_plev(new_state_surface,next_month)],dim=1),
+                    state_surface=torch.concatenate([denorm_surface(batch['state_surface'],cur_month),denorm_plev(batch['state_surface'],cur_month)],dim=1),
+                   # time=batch['time']
+        )
         return batch
 
     

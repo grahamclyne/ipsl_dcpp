@@ -23,7 +23,7 @@ class EnsembleMetrics(Metric):
     - spread skill ratio (bias-free formula with residual)
     - CRPS
     '''
-    def __init__(self, dataset, level_shape=(5, 13), surface_shape=(1,9)):
+    def __init__(self, dataset, level_shape=(5, 13), surface_shape=(1,34)):
         # remember to call super
         super().__init__()
         # call `self.add_state`for every internal state that is needed for the metrics computations
@@ -55,7 +55,9 @@ class EnsembleMetrics(Metric):
                                 ('gpp', 0, 3),
                                 ('cVeg', 0, 4),
                                 ('evspsbl',0,5),
-                                ('ps',0,8)]
+                                ('ps',0,8),
+                                ('tos',0,9),
+                                ('hur',0,10)]
 
         # self.display_level_metrics = [('Z500', 0, 7),
         #                       ('Q700', 4, 9),
@@ -73,7 +75,7 @@ class EnsembleMetrics(Metric):
     
     def update(self, batch, preds) -> None:
         # inputs to this function should be denormalized
-        if isinstance(preds, list):
+        if isinstance(preds, list):            
             preds = {k:torch.stack([x[k] for x in preds], dim=1) for k in preds[0].keys()}
         # print(self.lat_coeffs.shape,'lat coeffs shape')
         # print(preds['next_state_surface'].shape,'preds shape')

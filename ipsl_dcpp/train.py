@@ -327,7 +327,7 @@ def main(cfg: DictConfig):
                 plugins=[],
                 limit_val_batches=1,
               #  limit_val_batches=cfg.limit_val_batches, # max 5 samples
-               # limit_train_batches=0.1 if cfg.debug else 1
+                limit_train_batches=1 if cfg.debug else None
                 )
     
     if cfg.debug:
