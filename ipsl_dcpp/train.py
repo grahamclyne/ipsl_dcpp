@@ -1,6 +1,7 @@
 from omegaconf import DictConfig,OmegaConf
 import hydra
 import torch
+import wandb
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint,TQDMProgressBar
@@ -231,7 +232,9 @@ def main(cfg: DictConfig):
                                         id=run_id,
                                         save_dir=cfg.cluster.wandb_dir,
                                         offline=(cfg.cluster.wandb_mode != 'online'))
-        
+        wandb.config = omegaconf.OmegaConf.to_container(
+        cfg, resolve=True, throw_on_missing=True
+    )
 
     if cfg.log and main_node and not Path(cfg.exp_dir).exists():
         print('registering exp on main node')
@@ -245,13 +248,13 @@ def main(cfg: DictConfig):
     train = hydra.utils.instantiate(
         cfg.dataloader.dataset,domain='train'
     )
-    # val = hydra.utils.instantiate(
-    #     cfg.dataloader.dataset,domain='val'
-    # )
-    # val_loader = torch.utils.data.DataLoader(val, 
-    #                                           batch_size=cfg.batch_size,
-    #                                           num_workers=cfg.cluster.cpus,
-    #                                           shuffle=False) 
+    val = hydra.utils.instantiate(
+        cfg.dataloader.dataset,domain='val'
+    )
+    val_loader = torch.utils.data.DataLoader(val, 
+                                              batch_size=cfg.batch_size,
+                                              num_workers=cfg.cluster.cpus,
+                                              shuffle=False) 
     train_loader = torch.utils.data.DataLoader(train, 
                                               batch_size=cfg.batch_size,
                                               num_workers=cfg.cluster.cpus,
@@ -333,7 +336,7 @@ def main(cfg: DictConfig):
     if cfg.debug:
         breakpoint()
 
-    trainer.fit(pl_module, train_loader,ckpt_path=ckpt_path)
+    trainer.fit(pl_module, train_loader,val_loader,ckpt_path=ckpt_path)
 
 
 

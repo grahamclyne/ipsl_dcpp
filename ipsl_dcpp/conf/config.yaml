@@ -1,7 +1,7 @@
-defaults:
-  - cluster: jean_zay_v100
+sq defaults:
+  - cluster: jean_zay_a100
   - dataloader: ipsl
-  - module: epsilon_no_conv_head_wd_actual
+  - module: v_prediction_no_conv_head_wd
   - override hydra/launcher: submitit_slurm
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none
