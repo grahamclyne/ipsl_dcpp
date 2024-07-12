@@ -17,15 +17,16 @@ fi
 cd $SCRATCH
 
 main() {
-    module load pytorch-gpu/py3/2.2.0
     #need to load 
     cd $SCRATCH
     if [[ "$gpu_version" == "a100" ]]; then
         module load cpuarch/amd
     fi
+    module load pytorch-gpu/py3/2.2.0
+
     mkdir $experiment_name
     cd $experiment_name
-    git clone -b $experiment_name "https://github.com/grahamclyne/ipsl_dcpp.git"
+    git clone "https://github.com/grahamclyne/ipsl_dcpp.git"
     cd ipsl_dcpp/ipsl_dcpp
     if [[ "$gpu_version" == "a100" ]]; then 
         python submit.py cluster="jean_zay_a100"

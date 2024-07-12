@@ -1,4 +1,4 @@
-sq defaults:
+defaults:
   - cluster: jean_zay_a100
   - dataloader: ipsl
   - module: v_prediction_no_conv_head_wd
