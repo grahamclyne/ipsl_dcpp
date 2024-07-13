@@ -61,6 +61,9 @@ class Diffusion(pl.LightningModule):
         prediction_type,
         num_ensemble_members,
         p_uncond,
+        flow_matching,
+
+
     ):
         super().__init__()
         self.__dict__.update(locals())
@@ -160,26 +163,39 @@ class Diffusion(pl.LightningModule):
 
         timesteps = torch.randint(0, self.noise_scheduler.config.num_train_timesteps, (bs,), device=device).long()
         surface_noise = torch.randn_like(batch['next_state_surface'])
-        batch['surface_noisy'] = self.noise_scheduler.add_noise(batch['next_state_surface'], surface_noise, timesteps)
-        batch['surface_noisy'] = self.noise_scheduler.scale_model_input(batch['surface_noisy'])
-        if(self.backbone.plev):
-            level_noise = troch.randn_like(batch['next_state_level'])
-            batch['level_noisy'] = self.noise_scheduler.add_noise(batch['level_noisy'], level_noise,timesteps)
-            batch['level_noisy'] = self.noise_scheduler.scale_model_input(batch['level_noisy'])
-        
+
         # Get the target for loss depending on the prediction type
-        if self.noise_scheduler.config.prediction_type == "epsilon":
-            target_surface = surface_noise
-           # target_level = level_noise
-        elif self.noise_scheduler.config.prediction_type == "v_prediction":
-            target_surface = self.noise_scheduler.get_velocity(batch['next_state_surface'], surface_noise, timesteps)
+        if not self.flow_matching:
+            batch['surface_noisy'] = self.noise_scheduler.add_noise(batch['next_state_surface'], surface_noise, timesteps)
+            batch['surface_noisy'] = self.noise_scheduler.scale_model_input(batch['surface_noisy'])
             if(self.backbone.plev):
-                target_level = self.noise_scheduler.get_velocity(batch['next_state_level'], level_noise, timesteps)
+                level_noise = troch.randn_like(batch['next_state_level'])
+                batch['level_noisy'] = self.noise_scheduler.add_noise(batch['level_noisy'], level_noise,timesteps)
+                batch['level_noisy'] = self.noise_scheduler.scale_model_input(batch['level_noisy'])
+            if self.noise_scheduler.config.prediction_type == "epsilon":
+                target_surface = surface_noise
+               # target_level = level_noise
+            elif self.noise_scheduler.config.prediction_type == "v_prediction":
+                target_surface = self.noise_scheduler.get_velocity(batch['next_state_surface'], surface_noise, timesteps)
+                if(self.backbone.plev):
+                    target_level = self.noise_scheduler.get_velocity(batch['next_state_level'], level_noise, timesteps)
+    
+            elif self.noise_scheduler.config.prediction_type == "sample":
+                target_surface = batch['next_state_surface']
+                target_level = batch['next_state_level']
 
-        elif self.noise_scheduler.config.prediction_type == "sample":
-            target_surface = batch['next_state_surface']
-            target_level = batch['next_state_level']
+        elif self.flow_matching:
+            coeff = timesteps / self.noise_scheduler.config.num_train_timesteps
+            coeff = coeff[:, None, None, None, None]
+            batch['surface_noisy'] = coeff * batch['state_surface'] + (1 - coeff)*surface_noise
+            batch['level_noisy'] = coeff * batch['state_level'] + (1 - coeff)*level_noise
 
+            target_surface = batch['next_state_surface'] - surface_noise
+            target_level = batch['next_state_level'] - level_noise
+
+
+
+        
         
         # create uncond
         sel = (torch.rand((bs,), device=device) > self.p_uncond)

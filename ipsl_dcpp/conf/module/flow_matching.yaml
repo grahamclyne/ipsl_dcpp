@@ -22,7 +22,7 @@ module:
   prediction_type: 'v_prediction'
   num_ensemble_members: 3
   p_uncond: 0.0
-  flow_matching: False
+  flow_matching: True
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather

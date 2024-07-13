@@ -7,6 +7,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.callbacks import ModelCheckpoint,TQDMProgressBar
 import submitit
 import os
+import omegaconf
 from pathlib import Path
 import signal
 try:
