@@ -1,4 +1,4 @@
-name: v_prediction_outliers_removed_wd
+name: v_prediction_no_conv_head_wd_v100
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']

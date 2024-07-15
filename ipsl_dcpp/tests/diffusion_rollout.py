@@ -25,9 +25,9 @@ pl_module = hydra.utils.instantiate(
     dataset=val_loader.dataset
 ).to(device)
 
-
+print(cfg)
 #x = np.stack(val.timestamps)[:,2]
-path = '/gpfsscratch/rech/mlr/udy16au/wandb/ipsl_diffusion/epsilon_no_conv_head_wd_actual-u1a2l9/checkpoints/epoch=10-step=64746.ckpt.ckpt'
+path = '/gpfsscratch/rech/mlr/udy16au/model_output/ipsl_diffusion/v_prediction_no_conv_head_wd_v100/checkpoints/checkpoint_global_step=220000.ckpt'
 #path = f'{cfg.exp_dir}/checkpoints/checkpoint_global_step=60000.ckpt'
 checkpoint_path = torch.load(path,map_location=torch.device('cuda'))
 #checkpoint_path = torch.load(f'epoch=45.ckpt',map_location=torch.device('mps'))
@@ -47,8 +47,8 @@ iter_val = iter(val_loader)
 # batch['solar_forcings'] = batch['solar_forcings'].to(device)
 
 #batch = {batch[k].to(device) if (k != 'time') and (k != 'next_time') and (k !=  else v  for k, v in batch.items()}
-lead_time_months=10
-num_ensemble_members=1
+lead_time_months=36
+num_ensemble_members=10
 for i in range(num_ensemble_members):
     #indices = np.stack(val.timestamps)[np.where((pd.to_datetime(x).year == 2001) & (pd.to_datetime(x).month == 1),True,False)][:,[0,1]]
     # batch = next(iter_val)

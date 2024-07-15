@@ -24,8 +24,8 @@ val = hydra.utils.instantiate(
     cfg.dataloader.dataset,domain='val'
 )
 val_loader = torch.utils.data.DataLoader(val, 
-                                            batch_size=cfg.batch_size,
-                                            num_workers=cfg.cluster.cpus,
+                                            batch_size=1,
+                                            num_workers=0,
                                             shuffle=True) 
 
 ensembles = []
@@ -34,7 +34,7 @@ class CPU_Unpickler(pickle.Unpickler):
         if module == 'torch.storage' and name == '_load_from_bytes':
             return lambda b: torch.load(io.BytesIO(b), map_location='cpu')
         else: return super().find_class(module, name)
-num_ensembles = 2
+num_ensembles = 10
 for i in range(0,num_ensembles):
    # ensembles.append(CPU_Unpickler(open(f'../{i}_rollout_v_predictions_30year_ssp_585_20e12882_50steps_fixed_velocity.pkl', 'rb')).load())
     ensembles.append(CPU_Unpickler(open(f'{cfg.exp_dir}/rollouts/{i}_rollout_{cfg.name}.pkl', 'rb')).load())
@@ -110,6 +110,8 @@ for i in range(num_ensembles):
 out_dir = f'{cfg.exp_dir}/plots'
 
 num_vars = 10
+minimum = 1000
+maximum = -1000
 for var_num in range(0,num_vars):
     fig, axes = plt.subplots(2, figsize=(16, 6))
     axes = axes.flatten()
@@ -117,14 +119,14 @@ for var_num in range(0,num_vars):
         axes[0].plot(np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)))
     # min = np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).min()
     # max = np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).max()
-        min = min if min < np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).min() else np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).min()
-        max = max if max > np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).max() else np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).max()
+        minimum = minimum if minimum < np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).min() else np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).min()
+        maximum = maximum if maximum > np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).max() else np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).max()
     for i in np.stack(ipsl_ensemble):
         axes[1].plot(np.nanmean(i['state_surface'][:num_steps,var_num],axis=(-1,-2)))
-        min = min if min < np.mean(np.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).min() else np.mean(np.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).min()
-        max = max if max > np.mean(np.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).max() else np.mean(np.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).max()
-    axes[0].set_ylim(min,max)
-    axes[1].set_ylim(min,max)
+        minimum = minimum if minimum < np.mean(np.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).min() else np.mean(np.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).min()
+        maximum =maximum if maximum > np.mean(np.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).max() else np.mean(np.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).max()
+    axes[0].set_ylim(minimum,maximum)
+    axes[1].set_ylim(minimum,maximum)
     axes[0].set_title('Predicted')
     axes[1].set_title('IPSL')
     axes[0].set_ylabel('Normalized Value')
@@ -164,26 +166,26 @@ for var_num in range(0,num_vars):
 
 
 #DO PLEV NOW
-# if(val.flattened_plev):
-#     num_vars = 10
-#     for var_num in range(10,num_vars+10):
-#         fig, axes = plt.subplots(1,2, figsize=(16, 6))
-#         axes = axes.flatten()
-#         container = []
-#         for time_step in range(num_steps-6):
-#             shell['tas'].data = np.stack(ensembles[0]['state_surface'])[time_step][0][var_num]
-#            # line = ax1.pcolormesh(steps[time_step][0,0,0])
-#             line = shell['tas'].plot.pcolormesh(ax=axes[0],add_colorbar=False)
-#             shell['tas'].data = np.stack(ipsl_ensemble[0]['state_surface'])[time_step][var_num]
-#             line1 = shell['tas'].plot.pcolormesh(ax=axes[1],add_colorbar=False)
-#             title = axes[0].text(0.5,1.05,"Diffusion Step {}".format(time_step), 
-#                             size=plt.rcParams["axes.titlesize"],
-#                             ha="center", transform=axes[0].transAxes,)
-#             axes[0].set_title('Predicted')
-#             axes[1].set_title('IPSL')
+if(val.flattened_plev):
+    num_vars = 10
+    for var_num in range(10,num_vars+10):
+        fig, axes = plt.subplots(1,2, figsize=(16, 6))
+        axes = axes.flatten()
+        container = []
+        for time_step in range(num_steps-6):
+            shell['tas'].data = np.stack(ensembles[0]['state_surface'])[time_step][0][var_num]
+           # line = ax1.pcolormesh(steps[time_step][0,0,0])
+            line = shell['tas'].plot.pcolormesh(ax=axes[0],add_colorbar=False)
+            shell['tas'].data = np.stack(ipsl_ensemble[0]['state_surface'])[time_step][var_num]
+            line1 = shell['tas'].plot.pcolormesh(ax=axes[1],add_colorbar=False)
+            title = axes[0].text(0.5,1.05,"Diffusion Step {}".format(time_step), 
+                            size=plt.rcParams["axes.titlesize"],
+                            ha="center", transform=axes[0].transAxes,)
+            axes[0].set_title('Predicted')
+            axes[1].set_title('IPSL')
         
-#             container.append([line, line1,title])
-#         plt.title(cfg.module.surface_variables[var_num])
+            container.append([line, line1,title])
+        plt.title(cfg.module.surface_variables[var_num])
         
-#         ani = animation.ArtistAnimation(fig, container, interval=200, blit=True)
-#         ani.save(f'{out_dir}/diffusion_comparison_plev_{var_num}.gif')
+        ani = animation.ArtistAnimation(fig, container, interval=200, blit=True)
+        ani.save(f'{out_dir}/diffusion_comparison_plev_{var_num}.gif')

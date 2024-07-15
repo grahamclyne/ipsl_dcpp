@@ -1,7 +1,7 @@
 defaults:
   - cluster: jean_zay_a100
   - dataloader: ipsl
-  - module: v_prediction_no_conv_head_wd
+  - module: v_prediction_year_cond_a100
   - override hydra/launcher: submitit_slurm
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none
@@ -16,7 +16,7 @@ exp_dir: ${cluster.wandb_dir}${module.project}/${name}/
 
 
 seed: 0
-max_steps: 250000
+max_steps: 300000
 batch_size: ${module.batch_size}
 resume: True
 
@@ -28,5 +28,5 @@ debug: False
 log: ${eval:'not ${debug}'} #wandb logging
 
 #put load_ckpt here
-#load_ckpt: /gpfsscratch/rech/mlr/udy16au/wandb/ipsl_diffusion/flattened_plev-s0t4u7/checkpoints/epoch=4-step=117705.ckpt
+load_ckpt: /gpfsscratch/rech/mlr/udy16au/wandb/ipsl_diffusion/flattened_plev-s0t4u7/checkpoints/epoch=4-step=117705.ckpt
 

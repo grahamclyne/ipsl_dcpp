@@ -129,7 +129,10 @@ class Diffusion(pl.LightningModule):
                                    batch['level_noisy']], dim=1)
   #      print(batch['state_surface'].shape, 'concatenated')
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
+        year = torch.tensor([int(x[0:4]) for x in batch['time']]).to(device)
+
         month_emb = self.month_embedder(month)
+        year_emb = self.month_embedder(year)
         timestep_emb = self.timestep_embedder(timesteps)
      #   print(batch['forcings'].shape,'first')
         ch4_emb = self.timestep_embedder(batch['forcings'][:,0])
@@ -137,7 +140,7 @@ class Diffusion(pl.LightningModule):
         cfc12_emb = self.timestep_embedder(batch['forcings'][:,2])
         c02_emb = self.timestep_embedder(batch['forcings'][:,3])
 
-        cond_emb = (month_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb)
+        cond_emb = (month_emb + year_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb)
         for wavelength_index in range(len(batch['solar_forcings'][0])):
             cond_emb += self.timestep_embedder(batch['solar_forcings'][:,wavelength_index]) 
         out = self.backbone(batch, cond_emb)
@@ -297,40 +300,40 @@ class Diffusion(pl.LightningModule):
 
 
             #visualize denoising proccess
-            from matplotlib import animation
-            import xarray as xr
-            import matplotlib.pyplot as plt
-            ds = xr.open_dataset(self.dataset.files[0])
-            shell = ds.isel(time=0)
-            fig, axes = plt.subplots(1,1, figsize=(16, 6))
-            steps = np.stack([x.cpu() for x in steps])
-            container = []
-            var_num = -1
-            for time_step in range(len(steps)):
-                # print(np.stack(ensembles[0]['state_surface']).shape)
-                # print(np.stack(ipsl_ensemble[0]['state_surface']).shape)
-                shell['tas'].data = steps[time_step][0][var_num]
-               # line = ax1.pcolormesh(steps[time_step][0,0,0])
-                line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=False,vmax=5,vmin=-5)
-                title = axes.text(0.5,1.05,"Diffusion Step {}".format(time_step), 
-                                size=plt.rcParams["axes.titlesize"],
-                                ha="center", transform=axes.transAxes,)
-                axes.set_title('denoise')
+           #  from matplotlib import animation
+           #  import xarray as xr
+           #  import matplotlib.pyplot as plt
+           #  ds = xr.open_dataset(self.dataset.files[0])
+           #  shell = ds.isel(time=0)
+           #  fig, axes = plt.subplots(1,1, figsize=(16, 6))
+           #  steps = np.stack([x.cpu() for x in steps])
+           #  container = []
+           #  var_num = -1
+           #  for time_step in range(len(steps)):
+           #      # print(np.stack(ensembles[0]['state_surface']).shape)
+           #      # print(np.stack(ipsl_ensemble[0]['state_surface']).shape)
+           #      shell['tas'].data = steps[time_step][0][var_num]
+           #     # line = ax1.pcolormesh(steps[time_step][0,0,0])
+           #      line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=False,vmax=5,vmin=-5)
+           #      title = axes.text(0.5,1.05,"Diffusion Step {}".format(time_step), 
+           #                      size=plt.rcParams["axes.titlesize"],
+           #                      ha="center", transform=axes.transAxes,)
+           #      axes.set_title('denoise')
             
-                container.append([line,title])
-            plt.title('')
+           #      container.append([line,title])
+           #  plt.title('')
             
-            ani = animation.ArtistAnimation(fig, container, interval=200, blit=True)
-            ani.save(f'denoise_{var_num}_{i}_epsilon.gif')
+           #  ani = animation.ArtistAnimation(fig, container, interval=200, blit=True)
+           #  ani.save(f'denoise_{var_num}_{i}_epsilon.gif')
 
 
-            fig, axes = plt.subplots(1,1, figsize=(16, 6))
-            var_num = -1
-            print(sample['next_state_surface'].shape)
-            shell['tas'].data = sample['next_state_surface'][0][var_num].cpu()
-           # line = ax1.pcolormesh(steps[time_step][0,0,0])
-            line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=True,vmax=5,vmin=-5)
-            fig.savefig(f'denoised_image_epsilon__{var_num}_{i}.png')
+           #  fig, axes = plt.subplots(1,1, figsize=(16, 6))
+           #  var_num = -1
+           #  print(sample['next_state_surface'].shape)
+           #  shell['tas'].data = sample['next_state_surface'][0][var_num].cpu()
+           # # line = ax1.pcolormesh(steps[time_step][0,0,0])
+           #  line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=True,vmax=5,vmin=-5)
+           #  fig.savefig(f'denoised_image_epsilon__{var_num}_{i}.png')
 
 
 
@@ -365,7 +368,7 @@ class Diffusion(pl.LightningModule):
             scheduler = self.noise_scheduler
         elif scheduler == 'ddim':
             from diffusers import DDIMScheduler
-            print('using ddim')
+           # print('using ddim')
             sched_cfg = self.noise_scheduler.config
             scheduler = DDIMScheduler(num_train_timesteps=sched_cfg.num_train_timesteps,
                                                        beta_schedule=sched_cfg.beta_schedule,
@@ -443,7 +446,7 @@ class Diffusion(pl.LightningModule):
                 
               #  local_batch['surface_noisy'] = remove_outliers(local_batch['surface_noisy'])
                # steps.append(local_batch['surface_noisy'])
-                steps.append(original_sample)
+                steps.append(local_batch['surface_noisy'])
               #  print(local_batch['surface_noisy'].shape)
               #  print(pred['next_state_surface'].shape)
                 #(alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
@@ -466,7 +469,7 @@ class Diffusion(pl.LightningModule):
             #sample,batch = self.dataset.denormalize(sample, batch)
             pass
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
-        return sample
+        return sample,steps
 
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), 
@@ -481,7 +484,20 @@ class Diffusion(pl.LightningModule):
                         'interval': 'step', # or 'epoch'
                         'frequency': 1}
         return [opt], [sched]
-    # def test_step(self, batch, batch_nb):
+    def test_step(self, batch, batch_nb):
+        self.validation_step(batch,batch_nb)
+        #do rollout
+        #do visualization of rollout
+        
+        return None
+        
+    def on_validation_epoch_end(self):
+        for metric in [self.metrics]:
+            out = metric.compute()
+            self.log_dict(out)# dont put on_epoch = True here
+            print(out)
+            metric.reset()
+            
     #     scratch = os.environ['SCRATCH']
     #     run_id = '20e12882'
     #     file_name = 'epoch=45.ckpt'
