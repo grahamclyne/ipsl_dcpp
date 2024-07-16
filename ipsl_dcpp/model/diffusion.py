@@ -469,7 +469,7 @@ class Diffusion(pl.LightningModule):
             #sample,batch = self.dataset.denormalize(sample, batch)
             pass
         #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
-        return sample,steps
+        return sample
 
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), 
