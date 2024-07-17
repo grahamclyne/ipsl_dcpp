@@ -20,7 +20,7 @@ max_steps: 300000
 batch_size: ${module.batch_size}
 resume: True
 
-save_step_frequency: 20000
+save_step_frequency: 10000
 log_freq: 200
 limit_val_batches: 0
 accumulate_grad_batches: 1
@@ -28,5 +28,5 @@ debug: True
 log: ${eval:'not ${debug}'} #wandb logging
 
 #put load_ckpt here
-load_ckpt: /gpfsscratch/rech/mlr/udy16au/model_output/ipsl_diffusion/v_prediction_year_cond_a100/checkpoints/checkpoint_global_step=20000.ckpt.ckpt
+#load_ckpt: /gpfsscratch/rech/mlr/udy16au/model_output/ipsl_diffusion/v_prediction_year_cond_a100/checkpoints/checkpoint_global_step=20000.ckpt.ckpt
 
