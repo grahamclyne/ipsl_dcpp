@@ -340,52 +340,5 @@ def main(cfg: DictConfig):
     trainer.fit(pl_module, train_loader,val_loader,ckpt_path=ckpt_path)
 
 
-
-
-
-
-
-
-
-
-
-
-
-    # log_path = f'{work_dir}/submitit_logs'
-    # Path(log_path).mkdir(exist_ok=True)
-    # exp_id = len(list(Path(log_path).glob(f'{run_id}_*')))
-    # Path(f'{log_path}/{run_id}_{exp_id}').mkdir()
-    # aex = submitit.AutoExecutor(folder=f'{log_path}/{run_id}_{exp_id}')
-    # if cfg.environment.name == 'jean_zay' and cfg.experiment.gpu_type == 'a100': # run on jean zay a100
-    #      torch.set_float32_matmul_precision('medium') # can be 'high' too ? 
-    #      aex.update_parameters(tasks_per_node=cfg.experiment.num_gpus, 
-    #                              nodes=1, 
-    #                              gpus_per_node=cfg.experiment.num_gpus, 
-    #                              slurm_time=cfg.experiment.slurm_time,
-    #                              cpus_per_task=cfg.experiment.num_cpus_per_task,
-    #                              slurm_account="mlr@a100",
-    #                              slurm_job_name=cfg.experiment.name,
-    #                              slurm_constraint="a100",
-    #                              slurm_qos="qos_gpu-t3",
-    #                          )
-    # elif cfg.environment.name == 'jean_zay' and cfg.experiment.gpu_type == 'v100': # run on jean zay a100
-    #     aex.update_parameters(tasks_per_node=cfg.experiment.num_gpus, 
-    #                              nodes=1, 
-    #                              gpus_per_node=cfg.experiment.num_gpus, 
-    #                              slurm_time=cfg.experiment.slurm_time,
-    #                             # cpus_per_task=cfg.experiment.num_cpus_per_task,
-    #                              slurm_account="mlr@v100",
-    #                              slurm_job_name=cfg.experiment.name,
-
-    #                              #slurm_hint='nomultithread',
-                                 
-    #                              slurm_constraint='v100-32g',
-    #                             #slurm_use_srun=True,
-    #                             # slurm_'nomultithread'
-    #                          )
-
-    # aex.submit(train, cfg,run_id)
-
-
 if __name__ == "__main__":
     main()

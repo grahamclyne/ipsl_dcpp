@@ -1,4 +1,3 @@
-
 import lightning.pytorch as pl
 import diffusers
 import torch
@@ -11,6 +10,45 @@ import time
 import pandas as pd
 import os 
 import pickle
+import matplotlib.pyplot as plt
+
+def visualize_denoise():
+    return False
+            #visualize denoising proccess
+           #  from matplotlib import animation
+           #  import xarray as xr
+           #  import matplotlib.pyplot as plt
+           #  ds = xr.open_dataset(self.dataset.files[0])
+           #  shell = ds.isel(time=0)
+           #  fig, axes = plt.subplots(1,1, figsize=(16, 6))
+           #  steps = np.stack([x.cpu() for x in steps])
+           #  container = []
+           #  var_num = -1
+           #  for time_step in range(len(steps)):
+           #      # print(np.stack(ensembles[0]['state_surface']).shape)
+           #      # print(np.stack(ipsl_ensemble[0]['state_surface']).shape)
+           #      shell['tas'].data = steps[time_step][0][var_num]
+           #     # line = ax1.pcolormesh(steps[time_step][0,0,0])
+           #      line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=False,vmax=5,vmin=-5)
+           #      title = axes.text(0.5,1.05,"Diffusion Step {}".format(time_step), 
+           #                      size=plt.rcParams["axes.titlesize"],
+           #                      ha="center", transform=axes.transAxes,)
+           #      axes.set_title('denoise')
+            
+           #      container.append([line,title])
+           #  plt.title('')
+            
+           #  ani = animation.ArtistAnimation(fig, container, interval=200, blit=True)
+           #  ani.save(f'denoise_{var_num}_{i}_epsilon.gif')
+
+
+           #  fig, axes = plt.subplots(1,1, figsize=(16, 6))
+           #  var_num = -1
+           #  print(sample['next_state_surface'].shape)
+           #  shell['tas'].data = sample['next_state_surface'][0][var_num].cpu()
+           # # line = ax1.pcolormesh(steps[time_step][0,0,0])
+           #  line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=True,vmax=5,vmin=-5)
+           #  fig.savefig(f'denoised_image_epsilon__{var_num}_{i}.png')
 def inc_time(batch_time):
     batch_time = datetime.datetime.strptime(batch_time,'%Y-%m')
     if(batch_time.month == 12):
@@ -86,7 +124,9 @@ class Diffusion(pl.LightningModule):
                                                        rescale_betas_zero_snr=True,
                                                        )
         self.p_uncond = p_uncond
-        
+
+
+    
     def init_from_ckpt(self, path, ignore_keys=list()):
         sd = torch.load(path, map_location="cpu")["state_dict"]
         keys = list(sd.keys())
@@ -106,35 +146,17 @@ class Diffusion(pl.LightningModule):
 
     def forward(self, batch, timesteps, sel=1):
         bs = batch['state_surface'].shape[0]
-        #print(sel.shape)
-        # batch['state_surface'] = batch['state_surface'].to('cuda')
-        # batch['state_constant']= batch['state_constant'].to('cuda')
-        # batch['prev_state_surface']=batch['prev_state_surface'].to('cuda')
         device = batch['state_surface'].device
-
-        # print(batch['surface_noisy'].shape)
-        # print(batch['state_surface'].shape)
-        # print(batch['state_constant'].shape)
-        # print(batch['prev_state_surface'].shape)
-       # batch['surface_noisy'] = batch['surface_noisy'].squeeze(1)
-        # print(batch['state_surface'].device)
-        # print(batch['surface_noisy'].device)
-        # print(batch['state_constant'].device)
-        # print(batch['prev_state_surface'].device)
-
         batch['state_surface'] = torch.cat([batch['state_surface']*sel,batch['prev_state_surface']*sel, 
                                    batch['surface_noisy'],batch['state_constant']], dim=1)
         if(self.backbone.plev):
             batch['state_level'] = torch.cat([batch['state_level']*sel,batch['prev_state_level']*sel, 
                                    batch['level_noisy']], dim=1)
-  #      print(batch['state_surface'].shape, 'concatenated')
         month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
         year = torch.tensor([int(x[0:4]) for x in batch['time']]).to(device)
-
         month_emb = self.month_embedder(month)
         year_emb = self.month_embedder(year)
         timestep_emb = self.timestep_embedder(timesteps)
-     #   print(batch['forcings'].shape,'first')
         ch4_emb = self.timestep_embedder(batch['forcings'][:,0])
         cfc11_emb = self.timestep_embedder(batch['forcings'][:,1])
         cfc12_emb = self.timestep_embedder(batch['forcings'][:,2])
@@ -144,22 +166,10 @@ class Diffusion(pl.LightningModule):
         for wavelength_index in range(len(batch['solar_forcings'][0])):
             cond_emb += self.timestep_embedder(batch['solar_forcings'][:,wavelength_index]) 
         out = self.backbone(batch, cond_emb)
-    #    print(out['next_state_surface'].shape,'out')
-        # if self.noise_scheduler.config.prediction_type == "v_prediction":
-        #     # estimate input noise
-        #     alpha = self.noise_scheduler.alphas_cumprod.to(self.device)[timesteps][:, None, None, None]
-
-        #     est_surface_noise = (batch['surface_noisy'] - out['next_state_surface']*alpha.sqrt())/(1-alpha).sqrt().add(1e-6)
-        #    # est_level_noise = (batch['level_noisy'] - out['next_state_level']*alpha.sqrt())/(1-alpha).sqrt().add(1e-6)
-
-        #     out = dict(next_state_surface=self.noise_scheduler.get_velocity(
-        #                      out['next_state_surface'], est_surface_noise, timesteps),
-        #                      #next_state_level=self.noise_scheduler.get_velocity(
-        #                      #out['next_state_level'], est_level_noise, timesteps)
-        #                      )
-
         return out
 
+
+    
     def training_step(self, batch, batch_nb):
         device = batch['state_surface'].device
         bs = batch['state_surface'].shape[0]
@@ -216,6 +226,8 @@ class Diffusion(pl.LightningModule):
 
         return loss
 
+
+    
     def validation_step(self, batch, batch_nb):        
         # for the validation, we make some generations and log them 
         samples = [self.sample(batch, num_inference_steps=self.num_inference_steps, 
@@ -227,11 +239,15 @@ class Diffusion(pl.LightningModule):
         denorm_batch = self.dataset.denormalize(batch)
         #tas_image = wandb.Image(samples[0]['state_surface'][0,0], caption="tas")
         images = [bw_to_bwr(x['state_surface'][0,0]) for x in samples]
-        self.logger.log_image('tas_image',images=images)
+
+        #need to fix this
+        #self.logger.log_image('tas_image',images=images)
         
         self.metrics.update(denorm_batch,denorm_samples)
         return None
 
+
+    
     def on_validation_epoch_end(self):
         for metric in [self.metrics]:
             out = metric.compute()
@@ -239,7 +255,91 @@ class Diffusion(pl.LightningModule):
             print(out)
             metric.reset()
 
+
+    def test_step(self, batch, batch_nb):
+        self.validation_step(batch,batch_nb)
+
+    def on_test_epoch_end(self):
+        for metric in [self.metrics]:
+            out = metric.compute()
+            self.log_dict(out)# dont put on_epoch = True here
+            print(out)
+            metric.reset()
+            
+    def predict_step(self,batch,batch_nb):
+        out_dir = f'./plots'
+
+        rollout_ensemble = []
+        for i in range(self.num_members):
+            rollout_ensemble.append(self.sample_rollout(batch,rollout_length=10,seed = i))
+        minimum = 1000
+        maximum = -1000
+        for var_num in range(0,34):
+            fig, axes = plt.subplots(2, figsize=(16, 6))
+            axes = axes.flatten()
+            for i in rollout_ensemble:
+                axes[0].plot(torch.mean(torch.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)))
+            # min = np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).min()
+            # max = np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).max()
+                minimum = minimum if minimum < torch.mean(torch.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).min() else np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).min()
+                maximum = maximum if maximum > torch.mean(torch.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).max() else np.mean(np.stack(i['state_surface'])[:num_steps,0,var_num],axis=(-1,-2)).max()
+            for i in np.stack(ipsl_ensemble):
+                axes[1].plot(torch.nanmean(i['state_surface'][:num_steps,var_num],axis=(-1,-2)))
+                minimum = minimum if minimum < torch.mean(torch.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).min() else np.mean(np.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).min()
+                maximum =maximum if maximum > torch.mean(torch.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).max() else np.mean(np.stack(i['state_surface'])[:num_steps,var_num],axis=(-1,-2)).max()
+            axes[0].set_ylim(minimum,maximum)
+            axes[1].set_ylim(minimum,maximum)
+            axes[0].set_title('Predicted')
+            axes[1].set_title('IPSL')
+            axes[0].set_ylabel('Normalized Value')
+            axes[1].set_ylabel('Normalized Value')
+            file_name = f'{out_dir}/normalized_comparison_var_{var_num}.png'
+            from pathlib import Path
+            output_file = Path(file_name)
+            output_file.parent.mkdir(exist_ok=True, parents=True)
+            plt.title(cfg.module.surface_variables[var_num])
+            fig.savefig(file_name)
+        
+        
+            ds = xr.open_dataset(val.files[0])
+            shell = ds.isel(time=0)
+            fig, axes = plt.subplots(1,2, figsize=(16, 6))
+            axes = axes.flatten()
+            container = []
+            for time_step in range(num_steps):
+                # print(np.stack(ensembles[0]['state_surface']).shape)
+                # print(np.stack(ipsl_ensemble[0]['state_surface']).shape)
+                shell['tas'].data = torch.stack(rollout_ensemble[0]['state_surface'])[time_step][0][var_num]
+               # line = ax1.pcolormesh(steps[time_step][0,0,0])
+                line = shell['tas'].plot.pcolormesh(ax=axes[0],add_colorbar=False)
+                shell['tas'].data = torch.stack(ipsl_ensemble[0]['state_surface'])[time_step][var_num]
+                line1 = shell['tas'].plot.pcolormesh(ax=axes[1],add_colorbar=False)
+                title = axes[0].text(0.5,1.05,"Diffusion Step {}".format(time_step), 
+                                size=plt.rcParams["axes.titlesize"],
+                                ha="center", transform=axes[0].transAxes,)
+                axes[0].set_title('Predicted')
+                axes[1].set_title('IPSL')
+            
+                container.append([line, line1,title])
+            plt.title(cfg.module.surface_variables[var_num])
+            
+            ani = animation.ArtistAnimation(fig, container, interval=100, blit=True)
+            ani.save(f'{out_dir}/diffusion_comparison_{var_num}.gif')
+
+
+
     
+
+
+
+
+
+
+
+
+
+    
+        
     def loss(self, pred, batch, lat_coeffs=None):
         if lat_coeffs is None:
             lat_coeffs = self.dataset.lat_coeffs_equi
@@ -263,81 +363,29 @@ class Diffusion(pl.LightningModule):
             loss = mse_surface.sum(1).mean((-3, -2, -1))
         return loss
 
-    def sample_rollout(self, batch, *args, lead_time_months, seed,**kwargs):
+
+    
+    def sample_rollout(self, batch, rollout_length, seed,**kwargs):
         device = batch['state_surface'].device
         history = dict(state_surface=[],next_state_surface=[])
         next_time = batch['next_time']    
         cur_year_index = int(next_time[0].split('-')[0]) - 1960
         cur_month_index = int(next_time[0].split('-')[-1]) - 1
         inc_time_vec = np.vectorize(inc_time)
-        for i in range(lead_time_months):
+        for i in range(rollout_length):
             start = time.time()
            # print(batch['state_surface'].shape)
-            
             print(i,'lead_time')
-            
-            sample,steps = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler='ddim',seed=100000*seed + i)
+            sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler='ddim',seed=100000*seed + i)
             next_time = batch['next_time']    
             cur_year_index = int(next_time[0].split('-')[0]) - 1960
             cur_month_index = int(next_time[0].split('-')[-1]) - 1
             new_state_surface=sample['next_state_surface'][:,:10].to(device)*self.dataset.surface_delta_stds.to(device).unsqueeze(0) + batch['state_surface'][:,:10].to(device)
             assert len(sample['next_state_surface'][:,:10].shape) == len(self.dataset.surface_delta_stds.to(device).unsqueeze(0).shape)
-            # print(sample['next_state_surface'][:,:10].shape)
-            # print(self.dataset.surface_delta_stds.shape)
-            # print(new_state_surface.shape)
-          #  prev_state_surface=sample['state_surface'].to(device)*torch.unsqueeze(self.dataset.surface_delta_stds,0).to(device) + batch['state_surface'].to(device)
-            #need to reshape flattened plev back to level and then un-delta-ize
             if(self.dataset.flattened_plev):
                 new_state_plev=sample['next_state_surface'][:,10:].to(device)*self.dataset.plev_delta_stds.to(device).unsqueeze(0).reshape(1,8*3,1,1) + batch['state_surface'][:,10:].to(device)
-                # new_state_plev = new_state_plev.reshape(-1,8*3,143,144)
-                # print('plev adjust',sample['next_state_surface'][:,10:].to(device).reshape(-1,8,3,143,144).shape)
-                # print(new_state_plev.shape)
-                # print(new_state_surface.shape)
-                # print(batch['state_surface'].shape)
-                # print(self.dataset.plev_delta_stds.shape)
                 new_state_surface = torch.concatenate([new_state_surface,new_state_plev],axis=1)
-
-
-
-            #visualize denoising proccess
-           #  from matplotlib import animation
-           #  import xarray as xr
-           #  import matplotlib.pyplot as plt
-           #  ds = xr.open_dataset(self.dataset.files[0])
-           #  shell = ds.isel(time=0)
-           #  fig, axes = plt.subplots(1,1, figsize=(16, 6))
-           #  steps = np.stack([x.cpu() for x in steps])
-           #  container = []
-           #  var_num = -1
-           #  for time_step in range(len(steps)):
-           #      # print(np.stack(ensembles[0]['state_surface']).shape)
-           #      # print(np.stack(ipsl_ensemble[0]['state_surface']).shape)
-           #      shell['tas'].data = steps[time_step][0][var_num]
-           #     # line = ax1.pcolormesh(steps[time_step][0,0,0])
-           #      line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=False,vmax=5,vmin=-5)
-           #      title = axes.text(0.5,1.05,"Diffusion Step {}".format(time_step), 
-           #                      size=plt.rcParams["axes.titlesize"],
-           #                      ha="center", transform=axes.transAxes,)
-           #      axes.set_title('denoise')
-            
-           #      container.append([line,title])
-           #  plt.title('')
-            
-           #  ani = animation.ArtistAnimation(fig, container, interval=200, blit=True)
-           #  ani.save(f'denoise_{var_num}_{i}_epsilon.gif')
-
-
-           #  fig, axes = plt.subplots(1,1, figsize=(16, 6))
-           #  var_num = -1
-           #  print(sample['next_state_surface'].shape)
-           #  shell['tas'].data = sample['next_state_surface'][0][var_num].cpu()
-           # # line = ax1.pcolormesh(steps[time_step][0,0,0])
-           #  line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=True,vmax=5,vmin=-5)
-           #  fig.savefig(f'denoised_image_epsilon__{var_num}_{i}.png')
-
-
-
-            
+          
             history['next_state_surface'].append(new_state_surface)
             history['state_surface'].append(batch['state_surface'])
             batch = dict(state_surface=new_state_surface,
@@ -354,10 +402,11 @@ class Diffusion(pl.LightningModule):
             print(f'sample took {end - start} to run')
         return history
 
+    
+    
     def sample(self, batch, 
                 scheduler,
                 num_inference_steps,
-                
                 denormalize,
                 seed=0,
                 cf_guidance=None,
@@ -384,36 +433,18 @@ class Diffusion(pl.LightningModule):
                                                       # thresholding=True,
                                     #  dynamic_thresholding_ratio=0.70
                                                      )
-            
-
         scheduler.set_timesteps(num_inference_steps)
-
         local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
         generator = torch.Generator(device='cpu')
         generator.manual_seed(seed)
-    
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
         local_batch['surface_noisy'] = surface_noise.to(self.device)
         if(self.backbone.plev):
             level_noise = torch.randn_like(batch['next_state_level'])
             local_batch['level_noisy'] = surface_noise.to(self.device)
-
         steps = []
         with torch.no_grad():
             for t in scheduler.timesteps:
-
-              #  prev_t = scheduler.previous_timestep(t)
-
-            #    alpha_prod_t = scheduler.alphas_cumprod[t]
-              #  alpha_prod_t_prev = scheduler.alphas_cumprod[prev_t] if prev_t >= 0 else scheduler.one
-             #   beta_prod_t = 1 - alpha_prod_t
-            #    beta_prod_t_prev = 1 - alpha_prod_t_prev
-            #    current_alpha_t = alpha_prod_t / alpha_prod_t_prev
-             #   current_beta_t = 1 - current_alpha_t
-                # print(t)
-              #  print(local_batch['surface_noisy'][0,0,0,:],'next time step')
-
-                #sel = (torch.rand((1,), device='cpu') > self.p_uncond)
                 pred = self.forward(local_batch, torch.tensor([t]).to(self.device))
                 #scheduler step finds the actual output (in this case, the delta) where next_state_surface is the velocity predicted
                 #uses https://github.com/huggingface/diffusers/blob/668e34c6e0019b29c887bcc401c143a7d088cb25/src/diffusers/schedulers/scheduling_ddpm.py#L525
@@ -468,9 +499,10 @@ class Diffusion(pl.LightningModule):
         if denormalize:
             #sample,batch = self.dataset.denormalize(sample, batch)
             pass
-        #denorm_sample = {k:v.detach() for k, v in denorm_sample.items()}
         return sample
 
+
+    
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), 
                                 lr=self.lr, betas=self.betas, 
@@ -484,55 +516,3 @@ class Diffusion(pl.LightningModule):
                         'interval': 'step', # or 'epoch'
                         'frequency': 1}
         return [opt], [sched]
-    def test_step(self, batch, batch_nb):
-        self.validation_step(batch,batch_nb)
-        #do rollout
-        #do visualization of rollout
-        
-        return None
-        
-    def on_validation_epoch_end(self):
-        for metric in [self.metrics]:
-            out = metric.compute()
-            self.log_dict(out)# dont put on_epoch = True here
-            print(out)
-            metric.reset()
-            
-    #     scratch = os.environ['SCRATCH']
-    #     run_id = '20e12882'
-    #     file_name = 'epoch=45.ckpt'
-    #     checkpoint_path = f'{scratch}/checkpoint_{run_id}/{file_name}'
-
-    #     self.init_from_ckpt(checkpoint_path)
-    #     device = batch['state_surface'].device
-    #     x = np.stack(self.dataset.timestamps)[:,2]
-    #     indices = np.stack(self.dataset.timestamps)[np.where((pd.to_datetime(x).year == 2001) & (pd.to_datetime(x).month == 1),True,False)][:,[0,1]]
-    #     # 
-    #     # 
-    #     # checkpoint_path = torch.load(f'{scratch}/checkpoint_{run_id}/{file_name}',map_location=torch.device('cuda'))
-    #     # model.load_state_dict(checkpoint_path['state_dict'])
-    #     # # trainer.test(model, val_dataloader)
-
-    #     inv_map = {v: k for k, v in self.dataset.id2pt.items()}
-    #     index = inv_map[(indices[0][0],indices[0][1])]
-
-    #     batch = self.dataset.__getitem__(index)
-    #     # batch['state_surface'] = batch['state_surface'].to(device)
-    #     # batch['prev_state_surface'] = batch['prev_state_surface'].to(device)
-    #     # batch['forcings'] = batch['forcings'].to(device)
-    #     batch['state_constant'] = torch.tensor(batch['state_constant'])
-    #     batch['time'] = [batch['time']]
-    #     batch['next_time'] = [batch['next_time']]
-    #     for k, v in batch.items():
-    #         print(k)
-    #         if(k != 'time' and k != 'next_time'):
-    #             batch[k] = batch[k].to(device)
-        
-
-    #     print(batch['time'])
-    #     batch = {k: v.unsqueeze(0) if (k != 'time') and (k != 'next_time') else v for k, v in batch.items()}        
-    #     for i in range(3):
-    #         print(i,'ensemble member')
-    #         output = self.sample_rollout(batch, lead_time_months=60,seed = i)
-    #         with open(f'{i}_rollout_v_predictions_30year_ssp_585_{run_id}_50_inference_steps.pkl','wb') as f:
-    #             pickle.dump(output,f)

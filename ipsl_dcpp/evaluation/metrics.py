@@ -51,18 +51,16 @@ class EnsembleMetrics(Metric):
 
         self.add_state("lat_coeffs", default=dataset.lat_coeffs_equi)
 
-        self.display_surface_metrics = [('tas', 0, 0),
-                                ('gpp', 0, 3),
-                                ('cVeg', 0, 4),
-                                ('evspsbl',0,5),
-                                ('ps',0,8),
-                                ('tos',0,9),
-                                ('hur',0,10)]
+        
 
-        # self.display_level_metrics = [('Z500', 0, 7),
-        #                       ('Q700', 4, 9),
-        #                       ('T850', 3, 10)]
 
+        var_names = dataset.surface_variables.copy()
+        plev_var_names = [[x+'_850',x+'_750',x+'_500'] for x in dataset.plev_variables]
+        for x in plev_var_names:
+            for name in x:
+                var_names.append(name)
+        self.display_surface_metrics = [(var_names[index], 0, index) for index in range(len(var_names))]
+    
     def wmse(self, x, y=0): # weighted mse error
         return (x - y).pow(2).mul(self.lat_coeffs).nanmean((-2, -1))
 
