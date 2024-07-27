@@ -13,6 +13,8 @@ import pickle
 import matplotlib.pyplot as plt
 import xarray as xr
 from matplotlib import animation
+from copy import deepcopy
+
 
 def visualize_denoise(steps,dataset):
     #visualize denoising proccess
@@ -101,10 +103,8 @@ class Diffusion(pl.LightningModule):
         prediction_type,
         num_ensemble_members,
         p_uncond,
-        flow_matching,
-        num_rollout_steps
-
-
+        num_rollout_steps,
+        scheduler
     ):
         super().__init__()
         self.__dict__.update(locals())
@@ -115,7 +115,7 @@ class Diffusion(pl.LightningModule):
         self.dataset = dataset
         self.metrics = EnsembleMetrics(dataset=dataset)
         self.num_inference_steps = num_inference_steps
-        self.scheduler = 'ddpm'
+        self.scheduler = scheduler
         self.num_members = num_ensemble_members
         self.num_rollout_steps = num_rollout_steps
         if scheduler == 'ddpm':
@@ -126,12 +126,12 @@ class Diffusion(pl.LightningModule):
                                                            prediction_type=prediction_type,
                                                            clip_sample=False,
                                                            clip_sample_range=1e6,
-                                                           #rescale_betas_zero_snr=True,
+                                                           rescale_betas_zero_snr=True,
                                                            )
         elif scheduler == 'flow':
             from diffusers.schedulers import FlowMatchEulerDiscreteScheduler
             self.noise_scheduler = FlowMatchEulerDiscreteScheduler(
-                num_train_timesteps=num_train_timesteps)
+                num_train_timesteps=num_diffusion_timesteps)
 
 
         self.p_uncond = p_uncond
@@ -212,14 +212,14 @@ class Diffusion(pl.LightningModule):
                     sigma = sigma.unsqueeze(-1)
                 return sigma
                     
-                # Add noise according to flow matching.
-                sigmas = get_sigmas(timesteps, n_dim=batch['next_state_surface'].ndim, dtype=batch['next_state_surface'].dtype)
-                
-                batch['surface_noisy'] = noisy_surface_input = sigmas * surface_noise + (1.0 - sigmas) * batch['next_state_surface']
-                batch['level_noisy'] = noisy_level_input = sigmas * level_noise + (1.0 - sigmas) * batch['next_state_level']
-    
-                target_surface = surface_noise - batch['next_state_surface']
-                target_level = level_noise - batch['next_state_level']
+            # Add noise according to flow matching.
+            sigmas = get_sigmas(timesteps, n_dim=batch['next_state_surface'].ndim, dtype=batch['next_state_surface'].dtype)
+            
+            batch['surface_noisy'] = noisy_surface_input = sigmas * surface_noise + (1.0 - sigmas) * batch['next_state_surface']
+          #  batch['level_noisy'] = noisy_level_input = sigmas * level_noise + (1.0 - sigmas) * batch['next_state_level']
+
+            target_surface = surface_noise - batch['next_state_surface']
+         #   target_level = level_noise - batch['next_state_level']
         else:             
             batch['surface_noisy'] = self.noise_scheduler.add_noise(batch['next_state_surface'], surface_noise, timesteps)
             batch['surface_noisy'] = self.noise_scheduler.scale_model_input(batch['surface_noisy'])
@@ -267,7 +267,7 @@ class Diffusion(pl.LightningModule):
         # for the validation, we make some generations and log them 
         samples = [self.sample(batch, num_inference_steps=self.num_inference_steps, 
                                 denormalize=False, 
-                                scheduler='ddim', 
+                                scheduler=self.scheduler, 
                                 seed = j)
                             for j in range(self.num_members)]
         denorm_samples = [self.dataset.denormalize(x) for x in samples]
@@ -494,7 +494,7 @@ class Diffusion(pl.LightningModule):
             start = time.time()
            # print(batch['state_surface'].shape)
             print(i,'lead_time')
-            sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler='ddpm',seed=100000*seed + i)
+            sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler=self.scheduler,seed=100000*seed + i)
             next_time = batch['next_time']    
             cur_year_index = int(next_time[0].split('-')[0]) - 1960
             cur_month_index = int(next_time[0].split('-')[-1]) - 1
@@ -557,7 +557,7 @@ class Diffusion(pl.LightningModule):
         if cf_guidance is None:
             cf_guidance = 1
         if scheduler == 'ddpm':
-            scheduler = self.noise_scheduler
+            scheduler = deepcopy(self.noise_scheduler)
         elif scheduler == 'ddim':
             from diffusers import DDIMScheduler
             sched_cfg = self.noise_scheduler.config
@@ -575,6 +575,10 @@ class Diffusion(pl.LightningModule):
                                                       # thresholding=True,
                                     #  dynamic_thresholding_ratio=0.70
                                                      )
+        elif scheduler == 'flow':
+            scheduler = deepcopy(self.noise_scheduler)
+
+
         scheduler.set_timesteps(num_inference_steps)
         #mask = torch.where(batch['state_surface']==20,1.0,0.0)        
 
@@ -610,9 +614,9 @@ class Diffusion(pl.LightningModule):
                 local_batch['surface_noisy'] = scheduler.step(pred['next_state_surface'], t, 
                                                             local_batch['surface_noisy'], 
                                                             generator=generator).prev_sample
-                original_sample = scheduler.step(pred['next_state_surface'], t, 
-                                                            local_batch['surface_noisy'], 
-                                                            generator=generator).pred_original_sample
+                # original_sample = scheduler.step(pred['next_state_surface'], t, 
+                #                                             local_batch['surface_noisy'], 
+                #                                             generator=generator).pred_original_sample
                 # if(self.backbone.plev):
                 #     local_batch['level_noisy'] = scheduler.step(pred['next_state_level'], t, 
                 #                                                 local_batch['level_noisy'], 
@@ -639,7 +643,7 @@ class Diffusion(pl.LightningModule):
                 #     sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],next_state_level=local_batch['level_noisy'])
                 #else:
             sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],time=batch['time'],next_time=batch['next_time']) 
-        visualize_denoise(steps,self.dataset)
+        #visualize_denoise(steps,self.dataset)
         if denormalize:
             #sample,batch = self.dataset.denormalize(sample, batch)
             pass
