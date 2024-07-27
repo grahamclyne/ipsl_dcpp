@@ -1,7 +1,7 @@
 defaults:
-  - cluster: jean_zay_a100
+  - cluster: jean_zay_v100
   - dataloader: ipsl
-  - module: v_prediction_year_cond_a100
+  - module: z_normalize_and_masked
   - override hydra/launcher: submitit_slurm
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none
@@ -24,9 +24,9 @@ save_step_frequency: 10000
 log_freq: 200
 limit_val_batches: 0
 accumulate_grad_batches: 1
-debug: True
+debug: False
 log: ${eval:'not ${debug}'} #wandb logging
 
 #put load_ckpt here
-#load_ckpt: /gpfsscratch/rech/mlr/udy16au/model_output/ipsl_diffusion/v_prediction_year_cond_a100/checkpoints/checkpoint_global_step=20000.ckpt.ckpt
+load_ckpt: /gpfsscratch/rech/mlr/udy16au/model_output/ipsl_diffusion/${module.name}/checkpoints/checkpoint_global_step=210000.ckpt
 

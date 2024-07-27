@@ -72,7 +72,8 @@ class PanguWeather(nn.Module):
                  use_skip,
                  conv_head,
                  soil,
-                plev
+                plev,
+                 output_dim,
                 ):
         super().__init__()
         self.__dict__.update(locals())
@@ -95,7 +96,7 @@ class PanguWeather(nn.Module):
         #nn.init.normal_(self.time_embedding.mlp[0].weight, std=0.02)
         #nn.init.normal_(self.time_embedding.mlp[2].weight, std=0.02)
         self.loss = torch.nn.MSELoss()
-
+        self.output_dim = output_dim
         self.patchembed2d = PatchEmbed2D(
             img_size=(lat_resolution, lon_resolution),
             patch_size=patch_size[1:],
@@ -157,15 +158,14 @@ class PanguWeather(nn.Module):
         # The outputs of the 2nd encoder layer and the 7th decoder layer are concatenated along the channel dimension.
 
         self.emb_dim = emb_dim
-        output_dim = (self.surface_ch - 1)//3 #one less for land mask and 3 for prev and noise
 
         if conv_head:
-            if(self.soil):
-                output_dim += (depth_ch * 11)
-            if(self.plev):
-                output_dim += (level_ch * 19)
+            # if(self.soil):
+            #     output_dim += (depth_ch * 11)
+            # if(self.plev):
+            #     output_dim += (level_ch * 19)
             #print(output_dim)
-            self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=output_dim,soil=self.soil,plev=self.plev)
+            self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=self.output_dim,soil=self.soil,plev=self.plev)
 
         else:
             self.patchrecovery2d = PatchRecovery2D((lat_resolution, lon_resolution), patch_size[1:], out_dim, output_dim)

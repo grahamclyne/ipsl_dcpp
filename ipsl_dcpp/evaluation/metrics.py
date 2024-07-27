@@ -60,7 +60,16 @@ class EnsembleMetrics(Metric):
             for name in x:
                 var_names.append(name)
         self.display_surface_metrics = [(var_names[index], 0, index) for index in range(len(var_names))]
-    
+        
+    def nanvar(self,tensor, dim, keepdim):
+        tensor_mean = tensor.nanmean(dim=dim, keepdim=True)
+        # print(tensor_mean)
+        # print(tensor_mean.shape)
+        # print(tensor.shape)
+        output = (tensor - tensor_mean).pow(2).nanmean(dim=dim, keepdim=keepdim)
+        # print(output)
+        return output
+        
     def wmse(self, x, y=0): # weighted mse error
         return (x - y).pow(2).mul(self.lat_coeffs).nanmean((-2, -1))
 
@@ -68,8 +77,7 @@ class EnsembleMetrics(Metric):
         return (x - y).abs().mul(self.lat_coeffs).nanmean((-2, -1))
 
     def wvar(self, x, dim=1): # weighted variance along axis
-        #variance of the predicted ensemble
-        return x.var(dim,keepdims=True).mul(self.lat_coeffs).nanmean((-2, -1))
+        return self.nanvar(x,dim,True).mul(self.lat_coeffs).nanmean((-2, -1))
     
     def update(self, batch, preds) -> None:
         # inputs to this function should be denormalized
@@ -79,6 +87,8 @@ class EnsembleMetrics(Metric):
         # print(preds['next_state_surface'].shape,'preds shape')
         self.nsamples += batch['next_state_surface'].shape[0]
         self.nmembers += preds['next_state_surface'].shape[0] * preds['next_state_surface'].shape[1] # total member predictions
+        # print(self.nsamples)
+        # print(self.nmembers)
         pred_ensemble_means = {k:v.mean(1) for k, v in preds.items()}
         # print(pred_ensemble_means['next_state_surface'].shape,'pred ensemble shape')
       #  self.err_level += self.wmse(batch['next_state_level'] - avg_preds['next_state_level']).sum(0) # 2 dimensions remaining
@@ -89,6 +99,9 @@ class EnsembleMetrics(Metric):
         # print(self.wvar(preds['next_state_surface']).shape)
         # print(self.wvar(preds['next_state_surface']))
         self.var_surface += self.wvar(preds['next_state_surface']).sum(0)
+        # print(preds['next_state_surface'])
+        # print(preds['next_state_surface'].shape)
+        # print(self.var_surface)
       #  self.var_level += self.wvar(preds['next_state_level']).sum(0)
 
         # log norm for unbiased sskill ratio estimation

@@ -18,6 +18,7 @@ train = hydra.utils.instantiate(
     domain='train',
     generate_statistics=False, #want normalized values
     delta=False,
+    z_normalize=True
 )
 
 
@@ -36,6 +37,6 @@ for count in range(1000):
     surface_deltas.append(surface_delta)
     plev_deltas.append(plev_delta)
 
-np.save('surface_delta_std_ensemble_split',np.nanstd(np.stack(surface_deltas),axis=0))
+np.save('z_norm_surface_delta_std_ensemble_split',np.nanstd(np.stack(surface_deltas),axis=0))
 #np.save('depth_delta_std',np.nanstd(np.stack(depth_deltas),axis=0))
-np.save('plev_delta_std_ensemble_split',np.nanstd(np.stack(plev_deltas),axis=0))
+np.save('z_norm_plev_delta_std_ensemble_split',np.nanstd(np.stack(plev_deltas),axis=0))

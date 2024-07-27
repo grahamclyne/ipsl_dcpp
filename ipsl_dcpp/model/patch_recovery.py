@@ -115,12 +115,12 @@ class PatchRecovery3D(nn.Module):
     
 class PatchRecovery3(nn.Module):
     def __init__(self, 
-        input_dim,
-        dim,
-        downfactor,
-        output_dim,
-        soil,
-        plev
+        input_dim=None,
+        dim=192,
+        downfactor=4,
+        output_dim=182,
+        soil=True,
+        plev=True
         ):
 # input dim equals input_dim*z since we will be flattening stuff ?
         super().__init__()

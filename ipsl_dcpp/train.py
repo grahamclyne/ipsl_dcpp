@@ -241,6 +241,7 @@ def main(cfg: DictConfig):
         print('registering exp on main node')
         hparams = OmegaConf.to_container(cfg, resolve=True)
         print(hparams)
+        wandb.config = hparams
         logger.log_hyperparams(hparams)
         Path(cfg.exp_dir).mkdir(parents=True)
         with open(Path(cfg.exp_dir) / 'config.yaml', 'w') as f:

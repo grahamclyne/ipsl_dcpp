@@ -99,16 +99,17 @@ def get_rectified_flow_loss_fn(sde, train, reduce_mean=True, eps=1e-3):
     else:
         ### standard rectified flow loss
         t = torch.rand(batch['state_surface'].shape[0], device=batch['state_surface'].device) * (sde.T - eps) + eps
-    print(t.shape)
-    print(t)
     t_expand = t.view(-1, 1, 1, 1).repeat(1, batch['state_surface'].shape[1], batch['state_surface'].shape[2], batch['state_surface'].shape[3])
-    batch['state_surface'] = t_expand * batch['state_surface'] + (1.-t_expand) * z0
-    target = batch['state_surface'] - z0 
-    
+    perturbed_data = t_expand * batch['next_state_surface'] + (1.-t_expand) * z0
+    target = batch['next_state_surface'] - z0 
+    batch['next_state_surface'] = perturbed_data
     #model_fn = mutils.get_model_fn(model, train=train)
-    model_fn = model.forward
-    score = model_fn(perturbed_data, t*999) ### Copy from models/utils.py 
+    model_fn = model.training_step
+    score = model_fn(batch, t*999) ### Copy from models/utils.py 
+    print('score',score.shape)
+    print(target.shape)
 
+      
     if sde.reflow_flag:
         ### we found LPIPS loss is the best for distillation when k=1; but good to have a try
         if sde.reflow_loss=='l2':
@@ -128,8 +129,9 @@ def get_rectified_flow_loss_fn(sde, train, reduce_mean=True, eps=1e-3):
         losses = torch.square(score - target)
     
     losses = reduce_op(losses.reshape(losses.shape[0], -1), dim=-1)
-
+    print(losses.shape)
     loss = torch.mean(losses)
+    print(loss.shape)
     return loss
 
   return loss_fn

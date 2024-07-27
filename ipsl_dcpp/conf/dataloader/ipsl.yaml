@@ -10,3 +10,4 @@ dataset:
   data_path: ${cluster.data_path}
   flattened_plev: ${module.flattened_plev}
   debug: ${debug}
+  z_normalize: ${module.z_normalize}
