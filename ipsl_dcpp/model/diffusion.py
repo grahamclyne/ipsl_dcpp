@@ -560,7 +560,7 @@ class Diffusion(pl.LightningModule):
         if cf_guidance is None:
             cf_guidance = 1
         if scheduler == 'ddpm':
-            scheduler = deepcopy(self.noise_scheduler)
+            scheduler = deepcopy(self.noise_scheduler)  
         elif scheduler == 'ddim':
             from diffusers import DDIMScheduler
             sched_cfg = self.noise_scheduler.config
