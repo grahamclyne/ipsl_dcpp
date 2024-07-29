@@ -313,8 +313,8 @@ class Diffusion(pl.LightningModule):
         # print(batch['time'])
         if(int(batch['time'][0].split('-')[-1]) != 2):
             return
+        #out_dir = f'{self.dataset.data_path}/plots_'
         out_dir = f'./plots'
-
         rollout_length = self.num_rollout_steps    #no greater than 118 please
         rollout_ensemble = []
 
@@ -332,8 +332,11 @@ class Diffusion(pl.LightningModule):
         for i in range(0,self.num_members):
             for j in range(0,rollout_length):
                 batch = self.dataset.__getitem__(i*rollout_length + j)
+                
                 batch_timeseries['state_surface'].append(batch['state_surface'])
             batch_timeseries['state_surface'] = torch.stack(batch_timeseries['state_surface'])
+            batch_timeseries['state_surface'] = torch.where(batch_timeseries['state_surface']==100,0,batch_timeseries['state_surface'])
+
             ipsl_ensemble.append(batch_timeseries)
             batch_timeseries = {'state_surface':[]}  
         ipsl_ensemble = np.stack(ipsl_ensemble) 
@@ -485,7 +488,7 @@ class Diffusion(pl.LightningModule):
         history = dict(state_surface=[],next_state_surface=[])
         next_time = batch['next_time']    
         inc_time_vec = np.vectorize(inc_time)
-        nulls = torch.where(batch['state_surface']==100,1.0,0.0)        
+        nulls = torch.where(batch['state_surface']==100,1.0,0.0)     
         print(nulls.shape)
         print(nulls.mean(axis=(0,2,3)))
         for i in range(rollout_length):
@@ -507,27 +510,27 @@ class Diffusion(pl.LightningModule):
             # print(self.dataset.ocean_mask.shape)
             # print(new_state_surface.shape)
             
-            # sample['next_state_surface'][:,1,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,1,:,:],0)
-            # sample['next_state_surface'][:,2,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,2,:,:],0)
-            # sample['next_state_surface'][:,3,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,3,:,:],0)
-            # sample['next_state_surface'][:,4,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,4,:,:],0)
-            # sample['next_state_surface'][:,6,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,6,:,:],0)
-            # sample['next_state_surface'][:,7,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,7,:,:],0)
-            # sample['next_state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),sample['next_state_surface'][:,9,:,:],0)
-            # sample['next_state_surface'][:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),sample['next_state_surface'][:,10:,:,:],0)
+            sample['next_state_surface'][:,1,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,1,:,:],0)
+            sample['next_state_surface'][:,2,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,2,:,:],0)
+            sample['next_state_surface'][:,3,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,3,:,:],0)
+            sample['next_state_surface'][:,4,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,4,:,:],0)
+            sample['next_state_surface'][:,6,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,6,:,:],0)
+            sample['next_state_surface'][:,7,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,7,:,:],0)
+            sample['next_state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),sample['next_state_surface'][:,9,:,:],0)
+            sample['next_state_surface'][:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),sample['next_state_surface'][:,10:,:,:],0)
             
-            # batch['state_surface'][:,1,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,1,:,:],0)
-            # batch['state_surface'][:,2,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,2,:,:],0)
-            # batch['state_surface'][:,3,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,3,:,:],0)
-            # batch['state_surface'][:,4,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,4,:,:],0)
-            # batch['state_surface'][:,6,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,6,:,:],0)
-            # batch['state_surface'][:,7,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,7,:,:],0)
-            # batch['state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),batch['state_surface'][:,9,:,:],0)
-            # batch['state_surface'][:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),batch['state_surface'][:,10:,:,:],0)
+            batch['state_surface'][:,1,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,1,:,:],0)
+            batch['state_surface'][:,2,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,2,:,:],0)
+            batch['state_surface'][:,3,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,3,:,:],0)
+            batch['state_surface'][:,4,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,4,:,:],0)
+            batch['state_surface'][:,6,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,6,:,:],0)
+            batch['state_surface'][:,7,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,7,:,:],0)
+            batch['state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),batch['state_surface'][:,9,:,:],0)
+            batch['state_surface'][:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),batch['state_surface'][:,10:,:,:],0)
             # batch['state_surface'] = torch.where(nulls==1.0,100,batch['state_surface'])
             # new_state_surface = torch.where(nulls==1.0,100,new_state_surface)
             print(batch['state_surface'][0,0].mean())
-            print(batch['state_surface'][0,11].mean())
+            print(batch['state_surface'][0,9].mean())
             # print(new_state_surface[:,9,:,:].shape)
             history['next_state_surface'].append(new_state_surface)
             history['state_surface'].append(batch['state_surface'])
