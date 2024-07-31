@@ -20,9 +20,11 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                  data_path,
                  flattened_plev,
                  debug,
-                 z_normalize
+                 z_normalize,
+                 mask_value
                 ):
         self.flattened_plev = flattened_plev
+        self.mask_value = mask_value
         self.data_path = data_path
         self.delta = delta
         self.surface_variables=surface_variables
@@ -241,7 +243,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                   #z normalize
           
             if(self.z_normalize):
-                mask_val = 100
+                mask_val = self.mask_value
             else:
                 mask_val = 0
             input_surface_variables = torch.nan_to_num(input_surface_variables,mask_val)

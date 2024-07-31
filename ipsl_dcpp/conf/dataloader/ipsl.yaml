@@ -11,3 +11,4 @@ dataset:
   flattened_plev: ${module.flattened_plev}
   debug: ${debug}
   z_normalize: ${module.z_normalize}
+  mask_value: ${module.mask_value}

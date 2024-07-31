@@ -35,8 +35,8 @@ pl_module = hydra.utils.instantiate(
     dataset=test_loader.dataset
 ).to(device)
 
-path = f'{cfg.exp_dir}/checkpoints/checkpoint_global_step=37189.ckpt'
-#path = '/gpfsscratch/rech/mlr/udy16au/model_output/ipsl_diffusion/flow-r6u1g0/checkpoints/epoch=12-step=30000.ckpt'
+path = f'{cfg.exp_dir}/checkpoints/checkpoint_global_step=110000.ckpt'
+#path = '/gpfsscratch/rech/mlr/udy16au/model_output/ipsl_diffusion/flow_skip_smaller_embed-p3v4l5/checkpoints/epoch=2-step=4416.ckpt'
 # checkpoint_path = torch.load(path,map_location=torch.device('cuda'))
 # pl_module.load_state_dict(checkpoint_path['state_dict'])
 

@@ -60,9 +60,12 @@ class PatchRecovery2D(nn.Module):
         super().__init__()
         self.img_size = img_size
         self.conv = nn.ConvTranspose2d(in_chans, out_chans, patch_size, patch_size)
+        # print(img_size, patch_size, in_chans, out_chans)
 
     def forward(self, x):
+
         output = self.conv(x)
+        # print(output.shape)
         _, _, H, W = output.shape
         h_pad = H - self.img_size[0]
         w_pad = W - self.img_size[1]
@@ -72,7 +75,9 @@ class PatchRecovery2D(nn.Module):
 
         padding_left = w_pad // 2
         padding_right = int(w_pad - padding_left)
-
+        print(x.shape)
+        print(output.shape)
+        print(output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right].shape)
         return output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right]
 
 
@@ -94,6 +99,7 @@ class PatchRecovery3D(nn.Module):
 
     def forward(self, x: torch.Tensor):
         output = self.conv(x)
+
         _, _, Pl, Lat, Lon = output.shape
 
         pl_pad = Pl - self.img_size[0]
