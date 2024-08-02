@@ -1,4 +1,4 @@
-name: z_normalize_and_masked_with_zero
+name: z_norm_conv_head
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
@@ -17,18 +17,18 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 200000
-  num_inference_steps: 75
+  num_inference_steps: 100
   prediction_type: 'v_prediction'
   num_ensemble_members: 1
   p_uncond: 0.0
   scheduler: 'ddpm'
-  num_rollout_steps: 10
+  num_rollout_steps: 20
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
   soil: False
   plev: False
-  conv_head: False
+  conv_head: True
   lon_resolution: 144
   lat_resolution: 143
   emb_dim: 576

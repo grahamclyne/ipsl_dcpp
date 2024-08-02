@@ -35,6 +35,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.z_normalize = z_normalize
         self.files = list(glob.glob(f'{self.data_path}/batch_with_tos/*.nc'))
         self.normalization = normalization
+        self.elevation_data = torch.from_numpy(np.expand_dims(np.load(f'{self.data_path}/reference_data/elev_data.npy'),(0)))
         self.var_mask = torch.from_numpy(np.load(f'{self.data_path}/reference_data/land_mask.npy'))
         self.plev_mask = torch.from_numpy(np.expand_dims(np.load(f'{self.data_path}/reference_data/plev_mask.npy'),(0)))
         self.ocean_mask = torch.from_numpy(np.expand_dims(np.load(f'{self.data_path}/reference_data/ocean_mask.npy'),(0)))
@@ -286,7 +287,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                     state_level=input_plev_variables,
                 #    state_depth=input_depth_variables.type(torch.float32),
                    # state_constant=self.land_mask.astype(np.float32),
-                    state_constant=self.land_mask,
+                    state_constant=self.elevation_data,
                     next_state_surface=target_surface_variables,
                     next_state_level=target_plev_variables,
                 #    next_state_depth=target_depth_variables.type(torch.float32),

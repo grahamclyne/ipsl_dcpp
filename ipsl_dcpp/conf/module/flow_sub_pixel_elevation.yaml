@@ -1,11 +1,13 @@
-name: z_normalize_and_masked_with_zero
+name: flow_sub_pixel
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
 plev_variables: ['hur','hus','o3','ta','ua','va','wap','zg']
-batch_size: 1 
+#batch_size: ${eval:'16 if "${cluster.launcher.slurm_constraint}" == "a100" else 1'} #on a100
+
+batch_size: 8 
+z_normalize: False
 flattened_plev: True
-z_normalize: True
 mask_value: 0
 
 module:
@@ -16,19 +18,20 @@ module:
   betas: [0.9, 0.99]
   num_warmup_steps: 500
   num_cycles: 0.5
-  num_training_steps: 200000
-  num_inference_steps: 75
+  num_training_steps: 150000
+  num_inference_steps: 100
   prediction_type: 'v_prediction'
   num_ensemble_members: 1
   p_uncond: 0.0
-  scheduler: 'ddpm'
-  num_rollout_steps: 10
+  scheduler: 'flow'
+  num_rollout_steps: 25
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
   soil: False
   plev: False
   conv_head: False
+  sub_pixel: True
   lon_resolution: 144
   lat_resolution: 143
   emb_dim: 576
@@ -36,15 +39,15 @@ backbone:
   num_heads: [6, 12, 12, 6]
   patch_size: [2,2,2]
   two_poles: False
-  window_size: [1, 6, 12]
+  window_size: [1, 6, 12]   #how is this working when surface channel is only one? 
   depth_multiplier: 2
   position_embs_dim: 0
- # surface_ch: 30
- #30 surface variables and (3*8 level variables) * 3 for prev,current and next
-  surface_ch: 102
+ # surface_ch: 31
+ #31 surface variables and (3*8 level variables) * 3 for prev,current and next
+  surface_ch: 103
   output_dim: 34
   level_ch: 0
   #level_ch: 8
   depth_ch: 0
   use_skip: False
-  
+  cropped: False

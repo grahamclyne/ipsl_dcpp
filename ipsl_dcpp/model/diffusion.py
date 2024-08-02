@@ -26,7 +26,7 @@ def visualize_denoise(steps,dataset):
     fig, axes = plt.subplots(1,1, figsize=(16, 6))
     steps = np.stack([x.cpu() for x in steps])
     container = []
-    var_num = -1
+    var_num = 9
     for time_step in range(len(steps)):
         # print(np.stack(ensembles[0]['state_surface']).shape)
         # print(np.stack(ipsl_ensemble[0]['state_surface']).shape)
@@ -41,7 +41,7 @@ def visualize_denoise(steps,dataset):
         container.append([line,title])
     plt.title('')
     
-    ani = animation.ArtistAnimation(fig, container, interval=200, blit=True)
+    ani = animation.ArtistAnimation(fig, container, interval=300, blit=True)
     ani.save(f'denoise_{var_num}_epsilon.gif')
 
 
@@ -157,9 +157,11 @@ class Diffusion(pl.LightningModule):
 
     def forward(self, batch, timesteps, sel=1):
         bs = batch['state_surface'].shape[0]
+        print(batch['state_surface'].shape)
+        print(batch['prev_state_surface'].shape)
         device = batch['state_surface'].device
         batch['state_surface'] = torch.cat([batch['state_surface']*sel,batch['prev_state_surface']*sel, 
-                                   batch['surface_noisy']], dim=1)
+                                   batch['surface_noisy'],batch['state_constant']], dim=1)
         if(self.backbone.plev):
             batch['state_level'] = torch.cat([batch['state_level']*sel,batch['prev_state_level']*sel, 
                                    batch['level_noisy']], dim=1)
@@ -398,7 +400,7 @@ class Diffusion(pl.LightningModule):
             if(var_num < 10):
                 plt.title(self.dataset.surface_variables[var_num])
             
-            ani = animation.ArtistAnimation(fig, container, interval=100, blit=True)
+            ani = animation.ArtistAnimation(fig, container, interval=200, blit=True)
             ani.save(f'{out_dir}/diffusion_comparison_{var_num}.gif')
             
     
@@ -488,9 +490,7 @@ class Diffusion(pl.LightningModule):
         history = dict(state_surface=[],next_state_surface=[])
         next_time = batch['next_time']    
         inc_time_vec = np.vectorize(inc_time)
-        nulls = torch.where(batch['state_surface']==100,1.0,0.0)     
-        print(nulls.shape)
-        print(nulls.mean(axis=(0,2,3)))
+        nulls = torch.where(batch['state_surface']==0,1.0,0.0)     
         for i in range(rollout_length):
             print(batch['time'])
             print(batch['next_time'])
@@ -510,25 +510,25 @@ class Diffusion(pl.LightningModule):
             # print(self.dataset.ocean_mask.shape)
             # print(new_state_surface.shape)
             
-          #   sample['next_state_surface'][:,1,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,1,:,:],0)
-          #   sample['next_state_surface'][:,2,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,2,:,:],0)
-          #   sample['next_state_surface'][:,3,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,3,:,:],0)
-          #   sample['next_state_surface'][:,4,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,4,:,:],0)
-          #   sample['next_state_surface'][:,6,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,6,:,:],0)
-          #   sample['next_state_surface'][:,7,:,:] = torch.where(self.dataset.land_mask.to(device),sample['next_state_surface'][:,7,:,:],0)
-          # #  sample['next_state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),sample['next_state_surface'][:,9,:,:],0)
-          #   sample['next_state_surface'][:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),sample['next_state_surface'][:,10:,:,:],0)
+            # new_state_surface[:,1,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,1,:,:],0)
+            # new_state_surface[:,2,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,2,:,:],0)
+            # new_state_surface[:,3,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,3,:,:],0)
+            # new_state_surface[:,4,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,4,:,:],0)
+            # new_state_surface[:,6,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,6,:,:],0)
+            # new_state_surface[:,7,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,7,:,:],0)
+            # new_state_surface[:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),new_state_surface[:,9,:,:],0)
+            # new_state_surface[:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),new_state_surface[:,10:,:,:],0)
             
-          #   batch['state_surface'][:,1,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,1,:,:],0)
-          #   batch['state_surface'][:,2,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,2,:,:],0)
-          #   batch['state_surface'][:,3,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,3,:,:],0)
-          #   batch['state_surface'][:,4,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,4,:,:],0)
-          #   batch['state_surface'][:,6,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,6,:,:],0)
-          #   batch['state_surface'][:,7,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,7,:,:],0)
-          # #  batch['state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),batch['state_surface'][:,9,:,:],0)
-          #   batch['state_surface'][:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),batch['state_surface'][:,10:,:,:],0)
-            # batch['state_surface'] = torch.where(nulls==1.0,100,batch['state_surface'])
-            # new_state_surface = torch.where(nulls==1.0,100,new_state_surface)
+            # batch['state_surface'][:,1,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,1,:,:],0)
+            # batch['state_surface'][:,2,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,2,:,:],0)
+            # batch['state_surface'][:,3,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,3,:,:],0)
+            # batch['state_surface'][:,4,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,4,:,:],0)
+            # batch['state_surface'][:,6,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,6,:,:],0)
+            # batch['state_surface'][:,7,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,7,:,:],0)
+            # batch['state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),batch['state_surface'][:,9,:,:],0)
+            # batch['state_surface'][:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),batch['state_surface'][:,10:,:,:],0)
+            batch['state_surface'] = torch.where(nulls==1.0,0,batch['state_surface'])
+            new_state_surface = torch.where(nulls==1.0,0,new_state_surface)
             print(batch['state_surface'][0,0].mean())
             print(batch['state_surface'][0,9].mean())
             # print(new_state_surface[:,9,:,:].shape)
@@ -646,7 +646,7 @@ class Diffusion(pl.LightningModule):
                 #     sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],next_state_level=local_batch['level_noisy'])
                 #else:
             sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],time=batch['time'],next_time=batch['next_time']) 
-        #visualize_denoise(steps,self.dataset)
+       # visualize_denoise(steps[::5],self.dataset)
         if denormalize:
             #sample,batch = self.dataset.denormalize(sample, batch)
             pass

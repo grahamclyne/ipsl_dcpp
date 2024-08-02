@@ -4,7 +4,7 @@ from ipsl_dcpp.model.embedding import PatchEmbed2D,PatchEmbed3D
 import numpy as np
 import torch
 #from ipsl_dataset import surface_variables,plev_variables,depth_variables
-from ipsl_dcpp.model.patch_recovery import PatchRecovery2D,PatchRecovery3D,PatchRecovery3
+from ipsl_dcpp.model.patch_recovery import PatchRecovery2D,PatchRecovery3D,PatchRecovery3,PatchRecovery4
 from ipsl_dcpp.model.sampling import UpSample,DownSample
 import math
 #from pudb import set_trace; set_trace()
@@ -74,6 +74,8 @@ class PanguWeather(nn.Module):
                  soil,
                 plev,
                  output_dim,
+                 cropped,
+                 sub_pixel
                 ):
         super().__init__()
         self.__dict__.update(locals())
@@ -82,7 +84,8 @@ class PanguWeather(nn.Module):
         #self.zdim = 8 if patch_size[0]==2 else 5 # 5 for patch size 4
         self.soil = soil
         self.plev = plev
-
+        self.cropped=cropped
+        self.sub_pixel = sub_pixel
         self.zdim = 11 if self.plev else 1
     #    self.zdim = 7 if self.soil else 1
         #this is some off by one error where the padding makes up for the fact that this is in fact 35x36 if i use lat_resolution and lon_resolution
@@ -158,14 +161,15 @@ class PanguWeather(nn.Module):
         # The outputs of the 2nd encoder layer and the 7th decoder layer are concatenated along the channel dimension.
 
         self.emb_dim = emb_dim
-
+        if self.sub_pixel:
+            self.patchrecovery4 = PatchRecovery4(input_dim=emb_dim,output_dim=self.output_dim)
         if conv_head:
             # if(self.soil):
             #     output_dim += (depth_ch * 11)
             # if(self.plev):
             #     output_dim += (level_ch * 19)
             #print(output_dim)
-            self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=self.output_dim,soil=self.soil,plev=self.plev)
+            self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=self.output_dim,soil=self.soil,plev=self.plev,cropped=self.cropped)
 
         else:
             self.patchrecovery2d = PatchRecovery2D((lat_resolution, lon_resolution), patch_size[1:], out_dim, output_dim)
@@ -219,7 +223,16 @@ class PanguWeather(nn.Module):
         output = x
         #what is zdim here? output channels
         output = output.transpose(1, 2).reshape(output.shape[0], -1, self.zdim, *self.layer1_shape)
-        if not self.conv_head:
+        print(output.shape)
+        if self.sub_pixel:
+            output_surface = output[:, :, 0, :, :]
+            output_surface = self.patchrecovery4(output_surface)
+            out = dict(latent=latent,
+                            next_state_level=torch.empty(0), 
+                            next_state_surface=output_surface,
+                             next_state_depth=torch.empty(0)) 
+        
+        elif not self.conv_head:
             output_surface = output[:, :, 0, :, :]
             if(self.soil):
                 #output_upper_air = output[:, :, 1:-6, :, :]
@@ -232,10 +245,12 @@ class PanguWeather(nn.Module):
                 #            next_state_level=output_level, 
                             next_state_surface=output_surface,
                             next_state_depth=output_depth)
+        
             else:
           #      output_upper_air = output[:,:,1:,:,:]
                 output_surface = self.patchrecovery2d(output_surface)
           #      output_level = self.plev_patchrecovery3d(output_upper_air)
+                print('after conv head',output_surface.shape)
                 out = dict(latent=latent,
                             next_state_level=torch.empty(0), 
                             next_state_surface=output_surface,

@@ -215,12 +215,12 @@ def main(cfg: DictConfig):
 
             
         # trying to find checkpoints
-        ckpt_dir = Path(cfg.exp_dir).joinpath('checkpoints')
-        if ckpt_dir.exists():
-            ckpts = list(sorted(ckpt_dir.iterdir(), key=os.path.getmtime))
-            if len(ckpts):
-                print('Found checkpoints', ckpts)
-                ckpt_path = ckpts[-1]  
+        # ckpt_dir = Path(cfg.exp_dir).joinpath('checkpoints')
+        # if ckpt_dir.exists():
+        #     ckpts = list(sorted(ckpt_dir.iterdir(), key=os.path.getmtime))
+        #     if len(ckpts):
+        #         print('Found checkpoints', ckpts)
+        #         ckpt_path = ckpts[-1]  
 
 
     if cfg.log:

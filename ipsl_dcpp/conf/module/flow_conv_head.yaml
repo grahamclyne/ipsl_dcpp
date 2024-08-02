@@ -5,7 +5,7 @@ depth_variables: ['mrsfl','mrsol','mrsll']
 plev_variables: ['hur','hus','o3','ta','ua','va','wap','zg']
 #batch_size: ${eval:'16 if "${cluster.launcher.slurm_constraint}" == "a100" else 1'} #on a100
 
-batch_size: 16 #on v100
+batch_size: 1 #on v100
 z_normalize: False
 flattened_plev: True
 mask_value: 0
@@ -19,12 +19,12 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 50
+  num_inference_steps: 100
   prediction_type: 'v_prediction'
   num_ensemble_members: 1
   p_uncond: 0.0
   scheduler: 'flow'
-  num_rollout_steps: 10
+  num_rollout_steps: 25
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
@@ -49,3 +49,4 @@ backbone:
   #level_ch: 8
   depth_ch: 0
   use_skip: False
+  cropped: False

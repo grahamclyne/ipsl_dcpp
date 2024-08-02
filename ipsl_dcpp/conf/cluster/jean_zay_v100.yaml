@@ -15,7 +15,7 @@ launcher:
     gpus_per_node: ${cluster.gpus}
     nodes: 1
     tasks_per_node: ${cluster.gpus}
-    timeout_min: 780
+    timeout_min: 1200
     name: ${name}
   #  slurm_qos: qos_gpu-dev 
     slurm_partition: gpu_p2
