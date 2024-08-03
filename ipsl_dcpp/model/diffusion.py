@@ -157,8 +157,8 @@ class Diffusion(pl.LightningModule):
 
     def forward(self, batch, timesteps, sel=1):
         bs = batch['state_surface'].shape[0]
-        print(batch['state_surface'].shape)
-        print(batch['prev_state_surface'].shape)
+        # print(batch['state_surface'].shape)
+        # print(batch['prev_state_surface'].shape)
         device = batch['state_surface'].device
         batch['state_surface'] = torch.cat([batch['state_surface']*sel,batch['prev_state_surface']*sel, 
                                    batch['surface_noisy'],batch['state_constant']], dim=1)

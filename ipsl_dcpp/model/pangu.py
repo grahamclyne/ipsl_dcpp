@@ -223,7 +223,7 @@ class PanguWeather(nn.Module):
         output = x
         #what is zdim here? output channels
         output = output.transpose(1, 2).reshape(output.shape[0], -1, self.zdim, *self.layer1_shape)
-        print(output.shape)
+      #  print(output.shape)
         if self.sub_pixel:
             output_surface = output[:, :, 0, :, :]
             output_surface = self.patchrecovery4(output_surface)

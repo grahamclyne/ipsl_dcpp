@@ -35,7 +35,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         self.z_normalize = z_normalize
         self.files = list(glob.glob(f'{self.data_path}/batch_with_tos/*.nc'))
         self.normalization = normalization
-        self.elevation_data = torch.from_numpy(np.expand_dims(np.load(f'{self.data_path}/reference_data/elev_data.npy'),(0)))
+        self.elevation_data = torch.from_numpy(np.expand_dims(np.load(f'{self.data_path}/reference_data/elev_data.npy'),axis=(0)))
         self.var_mask = torch.from_numpy(np.load(f'{self.data_path}/reference_data/land_mask.npy'))
         self.plev_mask = torch.from_numpy(np.expand_dims(np.load(f'{self.data_path}/reference_data/plev_mask.npy'),(0)))
         self.ocean_mask = torch.from_numpy(np.expand_dims(np.load(f'{self.data_path}/reference_data/ocean_mask.npy'),(0)))
