@@ -39,7 +39,6 @@ pl_module = hydra.utils.instantiate(
 
 list_of_files = glob.glob(f'{cfg.exp_dir}/checkpoints/*') 
 path = max(list_of_files, key=os.path.getctime)
-print(path)
 #path = '/gpfsscratch/rech/mlr/udy16au/model_output/ipsl_diffusion/flow_skip_smaller_embed-p3v4l5/checkpoints/epoch=2-step=4416.ckpt'
 # checkpoint_path = torch.load(path,map_location=torch.device('cuda'))
 # pl_module.load_state_dict(checkpoint_path['state_dict'])

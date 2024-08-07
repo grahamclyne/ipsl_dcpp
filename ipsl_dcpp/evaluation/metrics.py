@@ -40,6 +40,7 @@ class EnsembleMetrics(Metric):
      #   self.add_state("norm_level", default=torch.zeros(level_shape), dist_reduce_fx="sum")
         self.add_state("prederr_surface", default=torch.zeros(surface_shape), dist_reduce_fx="sum")
      #   self.add_state("prederr_level", default=torch.zeros(level_shape), dist_reduce_fx="sum")
+        self.add_state("sharpness_ratio", default=torch.zeros(surface_shape), dist_reduce_fx="sum")
 
         # CRPS
         self.add_state("mae_surface", default=torch.zeros(surface_shape), dist_reduce_fx="sum")
@@ -51,7 +52,6 @@ class EnsembleMetrics(Metric):
 
         self.add_state("lat_coeffs", default=dataset.lat_coeffs_equi)
 
-        
 
 
         var_names = dataset.surface_variables.copy()
@@ -70,35 +70,44 @@ class EnsembleMetrics(Metric):
         # print(output)
         return output
         
-    def wmse(self, x, y=0): # weighted mse error
+    def wmse(self, x, y=1): # weighted mse error
         return (x - y).pow(2).mul(self.lat_coeffs).nanmean((-2, -1))
 
-    def wmae(self, x, y=0):
+    def wmae(self, x, y=1):
         return (x - y).abs().mul(self.lat_coeffs).nanmean((-2, -1))
 
     def wvar(self, x, dim=1): # weighted variance along axis
         return self.nanvar(x,dim,True).mul(self.lat_coeffs).nanmean((-2, -1))
-    
+
+    def sharpness(self,x,y):
+        x_sharp = (torch.abs(x[...,1:] - x[...,:-1]).sum((-1,-2)) + torch.abs(x[...,1:,:] - x[...,:-1,:]).sum((-1,-2))).nanmean(axis=1).sum(0)
+        y_sharp = (torch.abs(y[...,1:] - y[...,:-1]).sum((-1,-2)) + torch.abs(y[...,1:,:] - y[...,:-1,:]).sum((-1,-2))).nanmean(axis=1).sum(0)
+        return x_sharp/y_sharp
+        
     def update(self, batch, preds) -> None:
         # inputs to this function should be denormalized
-        if isinstance(preds, list):            
-            preds = {k:torch.stack([x[k] for x in preds], dim=1) for k in preds[0].keys()}
+        #batch and pred dimensions = [num_samples aka batch, num_members, variables, lat, lon]
+        
+        # if isinstance(preds, list):            
+        #     preds = {k:torch.stack([x[k] for x in preds], dim=1) for k in preds[0].keys()}
         # print(self.lat_coeffs.shape,'lat coeffs shape')
         # print(preds['next_state_surface'].shape,'preds shape')
-        self.nsamples += batch['next_state_surface'].shape[0]
-        self.nmembers += preds['next_state_surface'].shape[0] * preds['next_state_surface'].shape[1] # total member predictions
+        self.nsamples += batch.shape[0]
+        self.nmembers += preds.shape[0] * preds.shape[1] # total member predictions
         # print(self.nsamples)
         # print(self.nmembers)
-        pred_ensemble_means = {k:v.mean(1) for k, v in preds.items()}
+        pred_ensemble_means = preds.mean(axis=1,keepdims=True)
+        # print(pred_ensemble_means.shape)
+        # print(batch.shape)
         # print(pred_ensemble_means['next_state_surface'].shape,'pred ensemble shape')
       #  self.err_level += self.wmse(batch['next_state_level'] - avg_preds['next_state_level']).sum(0) # 2 dimensions remaining
-        self.err_surface += self.wmse((batch['next_state_surface'] - pred_ensemble_means['next_state_surface']).unsqueeze(1)).sum(0)
+        self.err_surface += self.wmse((batch - pred_ensemble_means)).sum(0)
         # print(batch['next_state_surface'][0,0,100])
         # print(pred_ensemble_means['next_state_surface'][0,0,100])
         # print(preds['next_state_surface'][0,0,0,100])
         # print(self.wvar(preds['next_state_surface']).shape)
         # print(self.wvar(preds['next_state_surface']))
-        self.var_surface += self.wvar(preds['next_state_surface']).sum(0)
+        self.var_surface += self.wvar(preds).sum(0)
         # print(preds['next_state_surface'])
         # print(preds['next_state_surface'].shape)
         # print(self.var_surface)
@@ -113,12 +122,14 @@ class EnsembleMetrics(Metric):
         #self.prederr_surface += self.wmse(batch['next_state_surface'] - batch['pred_state_surface']).sum(0)
 
         # for CRPS
-        self.mae_surface += self.wmae(preds['next_state_surface'] - batch['next_state_surface'].unsqueeze(1)).nanmean(1).sum(0)
+        print(self.wmae(preds - batch).shape)
+        self.mae_surface += self.wmae(preds - batch).nanmean(1).sum(0)
      #   self.mae_level += self.wmae(preds['next_state_level'] - batch['next_state_level'].unsqueeze(1)).mean(1).sum(0)
 
         # for dispersion, we unsqueeze on different values, then broadcast and average
-        self.disp_surface += self.wmae(preds['next_state_surface'].unsqueeze(1) - preds['next_state_surface'].unsqueeze(2)).nanmean((1, 2)).sum(0)
+        self.disp_surface += self.wmae(preds.unsqueeze(1) - preds.unsqueeze(2)).nanmean((1, 2)).sum(0)
     #    self.disp_level += self.wmae(preds['next_state_level'].unsqueeze(1) - preds['next_state_level'].unsqueeze(2)).mean((1, 2)).sum(0)
+        self.sharpness_ratio += self.sharpness(preds,batch)
 
 
     def compute(self) -> torch.Tensor:
@@ -137,6 +148,7 @@ class EnsembleMetrics(Metric):
          #   unbiased_spskr = (self.norm_surface / self.prederr_surface).sqrt(),
             
             crps = (self.mae_surface - .5*self.disp_surface)/self.nsamples,
+            sharpness = self.sharpness_ratio,
             )
 
         # print(surface_metrics['err'])
