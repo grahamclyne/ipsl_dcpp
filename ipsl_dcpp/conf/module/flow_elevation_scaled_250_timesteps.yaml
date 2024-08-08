@@ -1,4 +1,4 @@
-name: flow_sub_pixel_elevation_scaled_250_timesteps
+name: flow_elevation_scaled_250_timesteps
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
@@ -19,12 +19,12 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 100
+  num_inference_steps: 50
   prediction_type: 'v_prediction'
   num_ensemble_members: 3
   p_uncond: 0.0
   scheduler: 'flow'
-  num_rollout_steps: 50
+  num_rollout_steps: 25
   elevation: True
 
 backbone:
@@ -32,7 +32,7 @@ backbone:
   soil: False
   plev: False
   conv_head: False
-  sub_pixel: True
+  sub_pixel: False
   lon_resolution: 144
   lat_resolution: 143
   emb_dim: 576

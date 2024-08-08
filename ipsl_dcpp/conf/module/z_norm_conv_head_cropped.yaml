@@ -23,12 +23,14 @@ module:
   p_uncond: 0.0
   scheduler: 'ddpm'
   num_rollout_steps: 10
+  elevation: False
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
   soil: False
   plev: False
   conv_head: True
+  sub_pixel: False
   lon_resolution: 144
   lat_resolution: 143
   emb_dim: 576

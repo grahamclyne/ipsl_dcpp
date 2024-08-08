@@ -76,7 +76,7 @@ class EnsembleMetrics(Metric):
     def wmae(self, x, y=1):
         return (x - y).abs().mul(self.lat_coeffs).nanmean((-2, -1))
 
-    def wvar(self, x, dim=1): # weighted variance along axis
+    def wvar(self, x, dim=0): # weighted variance along axis
         return self.nanvar(x,dim,True).mul(self.lat_coeffs).nanmean((-2, -1))
 
     def sharpness(self,x,y):
@@ -86,7 +86,7 @@ class EnsembleMetrics(Metric):
         
     def update(self, batch, preds) -> None:
         # inputs to this function should be denormalized
-        #batch and pred dimensions = [num_samples aka batch, num_members, variables, lat, lon]
+        #batch and pred dimensions = [num_samples aka batch, num_pred_members_per_sample, variables, lat, lon]
         
         # if isinstance(preds, list):            
         #     preds = {k:torch.stack([x[k] for x in preds], dim=1) for k in preds[0].keys()}
@@ -122,7 +122,6 @@ class EnsembleMetrics(Metric):
         #self.prederr_surface += self.wmse(batch['next_state_surface'] - batch['pred_state_surface']).sum(0)
 
         # for CRPS
-        print(self.wmae(preds - batch).shape)
         self.mae_surface += self.wmae(preds - batch).nanmean(1).sum(0)
      #   self.mae_level += self.wmae(preds['next_state_level'] - batch['next_state_level'].unsqueeze(1)).mean(1).sum(0)
 
