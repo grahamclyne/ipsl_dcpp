@@ -64,8 +64,10 @@ class EnsembleMetrics(Metric):
     def nanvar(self,tensor, dim, keepdim):
         tensor_mean = tensor.nanmean(dim=dim, keepdim=True)
         # print(tensor_mean)
-        # print(tensor_mean.shape)
+        # print('tensor_mean_shape',tensor_mean.shape)
         # print(tensor.shape)
+        # print(tensor)
+        # print((tensor - tensor_mean))
         output = (tensor - tensor_mean).pow(2).nanmean(dim=dim, keepdim=keepdim)
         # print(output)
         return output
@@ -76,7 +78,7 @@ class EnsembleMetrics(Metric):
     def wmae(self, x, y=1):
         return (x - y).abs().mul(self.lat_coeffs).nanmean((-2, -1))
 
-    def wvar(self, x, dim=0): # weighted variance along axis
+    def wvar(self, x, dim=1): # weighted variance along axis
         return self.nanvar(x,dim,True).mul(self.lat_coeffs).nanmean((-2, -1))
 
     def sharpness(self,x,y):
@@ -86,7 +88,8 @@ class EnsembleMetrics(Metric):
         
     def update(self, batch, preds) -> None:
         # inputs to this function should be denormalized
-        #batch and pred dimensions = [num_samples aka batch, num_pred_members_per_sample, variables, lat, lon]
+        #batch and pred dimensions = [1, num_pred_members_per_sample (should be 1 for batch), variables, lat, lon]
+        #batch is a single run the "observation" that is used for crps and sss
         
         # if isinstance(preds, list):            
         #     preds = {k:torch.stack([x[k] for x in preds], dim=1) for k in preds[0].keys()}
@@ -96,7 +99,7 @@ class EnsembleMetrics(Metric):
         self.nmembers += preds.shape[0] * preds.shape[1] # total member predictions
         # print(self.nsamples)
         # print(self.nmembers)
-        pred_ensemble_means = preds.mean(axis=1,keepdims=True)
+        pred_ensemble_means = preds.mean(axis=1,keepdims=True)     #MEAN OF NUM OF ENSEMBLES PER BATCH
         # print(pred_ensemble_means.shape)
         # print(batch.shape)
         # print(pred_ensemble_means['next_state_surface'].shape,'pred ensemble shape')
@@ -107,6 +110,7 @@ class EnsembleMetrics(Metric):
         # print(preds['next_state_surface'][0,0,0,100])
         # print(self.wvar(preds['next_state_surface']).shape)
         # print(self.wvar(preds['next_state_surface']))
+
         self.var_surface += self.wvar(preds).sum(0)
         # print(preds['next_state_surface'])
         # print(preds['next_state_surface'].shape)
@@ -176,6 +180,5 @@ class EnsembleMetrics(Metric):
 
        # out['headline_unbiased_spskr'] = torch.stack([v for k, v in out.items() if 'unbiased_spskr' in k]).mean()
        # out['headline_spskr'] = torch.stack([v for k, v in out.items() if 'spskr' in k and not 'unbiased' in k]).mean()
-        print(out.keys())
 
         return out

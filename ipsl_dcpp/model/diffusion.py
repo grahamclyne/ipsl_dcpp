@@ -159,8 +159,8 @@ class Diffusion(pl.LightningModule):
 
     def forward(self, batch, timesteps, sel=1):
         bs = batch['state_surface'].shape[0]
-        # print(batch['state_surface'].shape)
-        # print(batch['prev_state_surface'].shape)
+        print(batch['state_surface'].shape)
+        print(batch['prev_state_surface'].shape)
         device = batch['state_surface'].device
         if(self.elevation):
             batch['state_surface'] = torch.cat([batch['state_surface']*sel,batch['prev_state_surface']*sel, 
@@ -274,6 +274,9 @@ class Diffusion(pl.LightningModule):
     
     def validation_step(self, batch, batch_nb):        
         # for the validation, we make some generations and log them 
+        #in validation, we take ONE batch and put it with X num_members
+        #this is different from predict, where we take x num_members and put it with 1 ensemble each - need to change this
+        
         samples = [self.sample(batch, num_inference_steps=self.num_inference_steps, 
                                 denormalize=False, 
                                 scheduler=self.scheduler, 
@@ -281,18 +284,26 @@ class Diffusion(pl.LightningModule):
                             for j in range(self.num_members)]
         denorm_samples = [self.dataset.denormalize(x)['next_state_surface'] for x in samples]
         denorm_batch = self.dataset.denormalize(batch)
-        #tas_image = wandb.Image(samples[0]['state_surface'][0,0], caption="tas")
-       # images = [bw_to_bwr(x['state_surface'][0,0]) for x in samples]
 
-        #need to fix this
-        #self.logger.log_image('tas_image',images=images)
-        denorm_batch = denorm_batch['next_state_surface'].unsqueeze(1)
+
        # denorm_samples [y for y in denorm_samples]
         denorm_samples = torch.stack(denorm_samples)
         denorm_samples = denorm_samples.swapdims(0,1)
-        # print(denorm_samples.shape)
-        # print(denorm_batch.shape)
+ 
+
+
+        #take first batch and add num_members dim, num_ensembles already populated
+        denorm_samples = denorm_samples[:1]
+        #take first instance of batch only, and unsqueeze for num_ensembles_dim
+        denorm_batch = denorm_batch['next_state_surface'][:1].unsqueeze(0)
+        print(denorm_samples.shape)
+        print(denorm_batch.shape)
         self.metrics.update(denorm_batch,denorm_samples)
+
+        #include image?
+        #tas_image = wandb.Image(samples[0]['state_surface'][0,0], caption="tas")
+       # images = [bw_to_bwr(x['state_surface'][0,0]) for x in samples]
+        #self.logger.log_image('tas_image',images=images)
         return None
 
 
@@ -345,23 +356,24 @@ class Diffusion(pl.LightningModule):
         rollout_ensemble = []
         ipsl_ensemble = []
         batch_timeseries = {'state_surface':[]}
-
-
-        for i in range(0,self.num_members):
+        num_batch_examples = 3
+        for k in range(0,num_batch_examples):
             for j in range(0,rollout_length):
-                batch = self.dataset.__getitem__((i*118) + j)
+                batch = self.dataset.__getitem__((k*118) + j)
                 batch_timeseries['state_surface'].append(batch['state_surface'])
-                if(j == 0):  #make one for each batch, could do experiments for different num per batch
-                    batch = {k:[batch[k]] if k == 'time' or k == 'next_time' else batch[k].unsqueeze(0) for k in batch.keys()}  #simulate lightnings batching dimensi
+                if(j == 0):
+                    batch = {k:[batch[k]] if k == 'time' or k == 'next_time' else batch[k].unsqueeze(0) for k in batch.keys()}  #simulate lightnings batching dimension
                     batch['state_surface'] = batch['state_surface'].to(device)
                     batch['prev_state_surface'] = batch['prev_state_surface'].to(device)
                     batch['forcings'] = batch['forcings'].to(device)
-                    batch['solar_forcings'] = batch['solar_forcings'].to(device)
-    
-                    batch['state_constant'] = batch['state_constant'].to(device)
-                    rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i)
-                    rollout['state_surface'] = torch.stack(rollout['state_surface'])
-                    rollout_ensemble.append(rollout)
+                    batch['solar_forcings'] = batch['solar_forcings'].to(device)#make n for each batch, could do experiments for different num per batch
+                    for i in range(0,self.num_members):
+                      
+        
+                        batch['state_constant'] = batch['state_constant'].to(device)
+                        rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i)
+                        rollout['state_surface'] = torch.stack(rollout['state_surface'])
+                        rollout_ensemble.append(rollout)
 
             batch_timeseries['state_surface'] = torch.stack(batch_timeseries['state_surface'])
           #  batch_timeseries['state_surface'] = torch.where(batch_timeseries['state_surface']==100,0,batch_timeseries['state_surface'])
@@ -373,7 +385,7 @@ class Diffusion(pl.LightningModule):
 
         minimum = 1000
         maximum = -1000
-        for var_num in range(0,10):
+        for var_num in range(0,1):
             fig, axes = plt.subplots(7, figsize=(16, 16))
             axes = axes.flatten()
             for i in rollout_ensemble:
@@ -421,7 +433,10 @@ class Diffusion(pl.LightningModule):
             writer = animation.FFMpegWriter(fps=100)
             ani = animation.ArtistAnimation(fig1, container)
             ani.save(f'{out_dir}/diffusion_comparison_{var_names[var_num][0]}_ffmpeg.gif',writer=writer)
-    
+
+
+
+            
             #calculate and plot sss and crps for timeseries
             #denormalize
             batch_denormed = []
@@ -429,7 +444,7 @@ class Diffusion(pl.LightningModule):
             denormed_batch_surface_ensembles = []
             denormed_plev_ensembles = []
             denormed_batch_plev_ensembles = []
-            for i in range(self.num_members):
+            for i in range(num_batch_examples):
                 month_index = 0
                 denormalized_surface = []
                 denormalized_plev = []
@@ -445,16 +460,18 @@ class Diffusion(pl.LightningModule):
                     # print(rollout_ensemble[i]['state_surface'][index].shape)
                     # print(ipsl_ensemble[i]['state_surface'][index].shape)
                     if(self.dataset.flattened_plev):
-                        denormed_plev = denorm_plev(rollout_ensemble[i]['state_surface'][index][0],month_index) #[0] here to remove batch index
                         batch_denormed_plev = denorm_plev(torch.Tensor(ipsl_ensemble[i]['state_surface'][index]),month_index)
                     
-                    denormed_surface = denorm_surface(rollout_ensemble[i]['state_surface'][index][0],month_index)
                     batch_denormed_surface = denorm_surface(torch.Tensor(ipsl_ensemble[i]['state_surface'][index]),month_index)
 
                     # print(denormed_surface.shape)
                     # print(denormed_plev.shape)
-                    denormalized_surface.append(torch.concatenate([denormed_surface,denormed_plev],axis=0))
                     b_denormalized_surface.append(torch.concatenate([batch_denormed_surface,batch_denormed_plev],axis=0))     
+                    for k in range(self.num_members):
+                        denormed_plev = denorm_plev(rollout_ensemble[(i+1) * k]['state_surface'][index][0],month_index) #[0] here to remove batch index
+                        denormed_surface = denorm_surface(rollout_ensemble[(i+1) * k]['state_surface'][index][0],month_index)
+                        denormalized_surface.append(torch.concatenate([denormed_surface,denormed_plev],axis=0))
+
                     if(month_index == 11):
                         month_index = 0
                     else:
@@ -463,47 +480,40 @@ class Diffusion(pl.LightningModule):
                 # denormed_batch_surface_ensembles.append(torch.stack(batch_denormed_surface))
                 denormed_surface_ensembles.append(torch.stack(denormalized_surface))
                 denormed_batch_surface_ensembles.append(torch.stack(b_denormalized_surface))
-            denormed_surface_ensembles = torch.stack(denormed_surface_ensembles)
+            denormed_surface_ensembles = torch.stack(denormed_surface_ensembles).reshape(num_batch_examples,rollout_length,self.num_members,34,143,144)
             denormed_batch_surface_ensembles = torch.stack(denormed_batch_surface_ensembles)
-            output_metrics = []
-            print(len(denormed_batch_surface_ensembles))
-            print('batch_shape',denormed_batch_surface_ensembles[0].shape)
-            for i in range(rollout_length):
-                # print(denormed_surface_ensembles[i].shape)
-                # print(denormed_batch_surface_ensembles[i].shape)
-                #place holder for number of ensembles 
-                preds = denormed_surface_ensembles[:,i].unsqueeze(1) #[3,1,34,143,144]
-                batch = denormed_batch_surface_ensembles[:,i].unsqueeze(1)
-                print(preds.shape,batch.shape)
-                self.metrics.update(batch,preds)
-                # print(self.metrics)
-                for metric in [self.metrics]:
-                    out = metric.compute()
-                   # self.log_dict(out)# dont put on_epoch = True here
-                    # print(out)
-                    metric.reset()
-                    output_metrics.append(torch.tensor(list(out.values())))
-                    # print(torch.tensor(list(out.values())))
-                    
-            output_metrics = torch.stack(output_metrics)
-            print('output_metrics',output_metrics.shape)
-            
-            axes[2].plot(output_metrics[:,0])
-            # print(out)
-            # print(out.keys())
-            # print(list(out.keys()))
-            # print(list(out.keys())[0])
+            for k in range(num_batch_examples):
+                output_metrics = []
+                for i in range(rollout_length):
+                    # print(denormed_surface_ensembles.shape)
+                    # print(denormed_batch_surface_ensembles.shape)
+                    #place holder for number of ensembles 
+                    preds = denormed_surface_ensembles[k,i].unsqueeze(0) #[3,1,34,143,144]
+                    batch = denormed_batch_surface_ensembles[k,i].unsqueeze(0).unsqueeze(1)
+                    # print(preds.shape,batch.shape)
+                    self.metrics.update(batch,preds)
+                    # print(self.metrics)
+                    for metric in [self.metrics]:
+                        out = metric.compute()
+                       # self.log_dict(out)# dont put on_epoch = True here
+                        # print(out)
+                        metric.reset()
+                        output_metrics.append(torch.tensor(list(out.values())))
+                        # print(torch.tensor(list(out.values())))
+                        
+                output_metrics_tensor = torch.stack(output_metrics)
+                axes[2].plot(output_metrics_tensor[:,0*(var_num+1)])
+                axes[2].set_title(list(out.keys())[0*(var_num+1)])
+                axes[3].plot(output_metrics_tensor[:,2*(var_num+1)])
+                axes[3].set_title(list(out.keys())[2*(var_num+1)])
+                axes[4].plot(output_metrics_tensor[:,3*(var_num+1)])
+                axes[4].set_title(list(out.keys())[3*(var_num+1)])
+                axes[5].plot(output_metrics_tensor[:,4*(var_num+1)])
+                axes[5].set_title(list(out.keys())[4*(var_num+1)])
+                fig.tight_layout()
 
-            axes[2].set_title(list(out.keys())[0])
-            fig.tight_layout()
-            axes[3].plot(output_metrics[:,2])
-            axes[3].set_title(list(out.keys())[2])
-            axes[4].plot(output_metrics[:,3])
-            axes[4].set_title(list(out.keys())[3])
-            axes[5].plot(output_metrics[:,4])
-            axes[5].set_title(list(out.keys())[4])
-            axes[6].plot(output_metrics[:,5])
-            axes[6].set_title(list(out.keys())[5])
+                # axes[6].plot(output_metrics_tensor[:,5])
+                # axes[6].set_title(list(out.keys())[5])
             #set title and save file
             # fig.suptitle(f'{var_names[var_num]}', fontsize=16)
             file_name = f'{out_dir}/normalized_comparison_{var_names[var_num][0]}.png'
