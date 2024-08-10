@@ -159,8 +159,8 @@ class Diffusion(pl.LightningModule):
 
     def forward(self, batch, timesteps, sel=1):
         bs = batch['state_surface'].shape[0]
-        print(batch['state_surface'].shape)
-        print(batch['prev_state_surface'].shape)
+       # print(batch['state_surface'].shape)
+       # print(batch['prev_state_surface'].shape)
         device = batch['state_surface'].device
         if(self.elevation):
             batch['state_surface'] = torch.cat([batch['state_surface']*sel,batch['prev_state_surface']*sel, 
@@ -296,8 +296,6 @@ class Diffusion(pl.LightningModule):
         denorm_samples = denorm_samples[:1]
         #take first instance of batch only, and unsqueeze for num_ensembles_dim
         denorm_batch = denorm_batch['next_state_surface'][:1].unsqueeze(0)
-        print(denorm_samples.shape)
-        print(denorm_batch.shape)
         self.metrics.update(denorm_batch,denorm_samples)
 
         #include image?
@@ -347,7 +345,9 @@ class Diffusion(pl.LightningModule):
         # if(int(batch['time'][0].split('-')[-1]) != 2): #check if beginning ?? does this work ? 
         #     return
         #out_dir = f'{self.dataset.data_path}/plots_'
-        out_dir = f'./plots'
+
+        out_dir = f'./plots/{self.dataset.plot_output_path}/'
+        os.mkdir(out_dir)
         rollout_length = self.num_rollout_steps    #no greater than 118 please
 
         # for i in range(self.num_members):

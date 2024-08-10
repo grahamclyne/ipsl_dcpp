@@ -1,4 +1,4 @@
-name: flow_sub_pixel_elevation_scaled_250_timesteps
+name: flow_smoothed_sub_pixel
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
@@ -40,7 +40,7 @@ backbone:
   num_heads: [6, 12, 12, 6]
   patch_size: [2,2,2]
   two_poles: False
-  window_size: [1, 6, 12]   #how is this working when surface channel is only one? 
+  window_size: [1, 6, 12]   
   depth_multiplier: 2
   position_embs_dim: 0
  # surface_ch: 31

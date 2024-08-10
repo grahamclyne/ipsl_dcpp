@@ -250,7 +250,7 @@ class PanguWeather(nn.Module):
           #      output_upper_air = output[:,:,1:,:,:]
                 output_surface = self.patchrecovery2d(output_surface)
           #      output_level = self.plev_patchrecovery3d(output_upper_air)
-                print('after conv head',output_surface.shape)
+           #     print('after conv head',output_surface.shape)
                 out = dict(latent=latent,
                             next_state_level=torch.empty(0), 
                             next_state_surface=output_surface,

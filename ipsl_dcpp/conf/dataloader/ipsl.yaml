@@ -12,3 +12,4 @@ dataset:
   debug: ${debug}
   z_normalize: ${module.z_normalize}
   mask_value: ${module.mask_value}
+  plot_output_path: ${module.name}_${module.module.num_inference_steps}

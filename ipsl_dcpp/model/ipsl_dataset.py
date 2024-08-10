@@ -21,9 +21,11 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                  flattened_plev,
                  debug,
                  z_normalize,
-                 mask_value
+                 mask_value,
+                 plot_output_path
                 ):
         self.flattened_plev = flattened_plev
+        self.plot_output_path = plot_output_path
         self.mask_value = mask_value
         self.data_path = data_path
         self.delta = delta
