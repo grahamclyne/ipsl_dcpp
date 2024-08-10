@@ -206,9 +206,11 @@ class PatchRecovery4(nn.Module):
     def __init__(self, 
         input_dim=192,
         output_dim=182,
+                 smoothing=False
         ):
         super().__init__()
         upscale_factor = 2
+        self.smoothing=smoothing
         self.pixelshuffle = nn.PixelShuffle(upscale_factor)
         self.conv = nn.Conv2d(input_dim, output_dim * (upscale_factor ** 2), 3, 1, 1, bias=0)
         weight = ICNR(self.conv.weight, initializer=nn.init.kaiming_normal_,
@@ -222,9 +224,10 @@ class PatchRecovery4(nn.Module):
         #x == (batch_size, 572, 72,72)
         output = self.conv(x)  
         output = self.pixelshuffle(output)  # (batch_size, 34, 144, 144)
-        output = self.smooth_conv(output)
-        output = self.smooth_conv1(output)
-
+        if(self.smoothing):
+            output = self.smooth_conv(output)
+            output = self.smooth_conv1(output)
+        
         output_surface = output[:,:,:143,:] # crop for irregular
         
         return output_surface

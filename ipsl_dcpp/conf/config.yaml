@@ -1,7 +1,7 @@
 defaults:
   - cluster: jean_zay_v100
   - dataloader: ipsl
-  - module: flow_smoothed_sub_pixel
+  - module: flow_sub_pixel_elevation_scaled_250_timesteps
   - override hydra/launcher: submitit_slurm
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none
@@ -28,5 +28,5 @@ debug: False
 log: ${eval:'not ${debug}'} #wandb logging
 
 #put load_ckpt here
-#load_ckpt: /gpfsscratch/rech/mlr/udy16au/model_output/ipsl_diffusion/${module.name}/checkpoints/checkpoint_global_step=55000.ckpt
+load_ckpt: /gpfsscratch/rech/mlr/udy16au/model_output/ipsl_diffusion/${module.name}/checkpoints/checkpoint_global_step=55000.ckpt
 

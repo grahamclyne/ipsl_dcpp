@@ -75,7 +75,8 @@ class PanguWeather(nn.Module):
                 plev,
                  output_dim,
                  cropped,
-                 sub_pixel
+                 sub_pixel,
+                 smoothing
                 ):
         super().__init__()
         self.__dict__.update(locals())
@@ -83,6 +84,7 @@ class PanguWeather(nn.Module):
         # In addition, three constant masks(the topography mask, land-sea mask and soil type mask)
         #self.zdim = 8 if patch_size[0]==2 else 5 # 5 for patch size 4
         self.soil = soil
+        self.smoothing = smoothing
         self.plev = plev
         self.cropped=cropped
         self.sub_pixel = sub_pixel
@@ -162,7 +164,7 @@ class PanguWeather(nn.Module):
 
         self.emb_dim = emb_dim
         if self.sub_pixel:
-            self.patchrecovery4 = PatchRecovery4(input_dim=emb_dim,output_dim=self.output_dim)
+            self.patchrecovery4 = PatchRecovery4(input_dim=emb_dim,output_dim=self.output_dim,smoothing=self.smoothing)
         if conv_head:
             # if(self.soil):
             #     output_dim += (depth_ch * 11)
