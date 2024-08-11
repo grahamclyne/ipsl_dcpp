@@ -52,3 +52,4 @@ backbone:
   depth_ch: 0
   use_skip: False
   cropped: False
+  smoothing: True
