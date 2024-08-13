@@ -11,5 +11,6 @@ cd ${WORK}/ipsl_dcpp/ipsl_dcpp/
 # conda init bash
 # conda activate env_gpu5 
 module load pytorch-gpu/py3/2.2.0
+module load ffmpeg
 #module load pytorch-cpu/py3/1.7.1 
 srun python diffusion_evaluation.py 

@@ -15,6 +15,7 @@ import xarray as xr
 from matplotlib import animation
 from copy import deepcopy
 import ffmpeg
+import pathlib
 
 def visualize_denoise(steps,dataset):
     #visualize denoising proccess
@@ -347,7 +348,7 @@ class Diffusion(pl.LightningModule):
         #out_dir = f'{self.dataset.data_path}/plots_'
 
         out_dir = f'./plots/{self.dataset.plot_output_path}/'
-        os.mkdir(out_dir)
+        os.makedirs(out_dir,exist_ok=True)
         rollout_length = self.num_rollout_steps    #no greater than 118 please
 
         # for i in range(self.num_members):
@@ -356,7 +357,8 @@ class Diffusion(pl.LightningModule):
         rollout_ensemble = []
         ipsl_ensemble = []
         batch_timeseries = {'state_surface':[]}
-        num_batch_examples = 3
+        num_batch_examples = 2
+        batch_colors = ['blue','yellow','black']
         for k in range(0,num_batch_examples):
             for j in range(0,rollout_length):
                 batch = self.dataset.__getitem__((k*118) + j)
@@ -371,7 +373,7 @@ class Diffusion(pl.LightningModule):
                       
         
                         batch['state_constant'] = batch['state_constant'].to(device)
-                        rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i)
+                        rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = (i+1) * k)
                         rollout['state_surface'] = torch.stack(rollout['state_surface'])
                         rollout_ensemble.append(rollout)
 
@@ -383,19 +385,20 @@ class Diffusion(pl.LightningModule):
         ipsl_ensemble = np.stack(ipsl_ensemble) 
 
 
-        minimum = 1000
-        maximum = -1000
-        for var_num in range(0,1):
+
+        for var_num in range(0,34):
+            minimum = 1000
+            maximum = -1000
             fig, axes = plt.subplots(7, figsize=(16, 16))
             axes = axes.flatten()
-            for i in rollout_ensemble:
-                axes[0].plot(torch.mean(i['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).cpu())
-                local_min = torch.mean(i['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).min().cpu()
-                local_max = torch.mean(i['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).max().cpu()
+            for i in range(len(rollout_ensemble)):
+                axes[0].plot(torch.mean(rollout_ensemble[i]['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).cpu(),color=batch_colors[(i+1)//3])
+                local_min = torch.mean(rollout_ensemble[i]['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).min().cpu()
+                local_max = torch.mean(rollout_ensemble[i]['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).max().cpu()
                 minimum = minimum if minimum < local_min else local_min
                 maximum = maximum if maximum > local_max else local_max
-            for i in ipsl_ensemble:
-                axes[1].plot(torch.nanmean(i['state_surface'][:rollout_length,var_num],axis=(-1,-2)).cpu())
+            for i in range(len(ipsl_ensemble)):
+                axes[1].plot(torch.nanmean(ipsl_ensemble[i]['state_surface'][:rollout_length,var_num],axis=(-1,-2)).cpu(),color=batch_colors[i])
             local_min = torch.mean(ipsl_ensemble[0]['state_surface'][:rollout_length,var_num],axis=(-1,-2)).min().cpu() 
             local_max = torch.mean(ipsl_ensemble[0]['state_surface'][:rollout_length,var_num],axis=(-1,-2)).max().cpu()
             minimum = minimum if minimum < local_min else local_min
@@ -502,13 +505,13 @@ class Diffusion(pl.LightningModule):
                         # print(torch.tensor(list(out.values())))
                         
                 output_metrics_tensor = torch.stack(output_metrics)
-                axes[2].plot(output_metrics_tensor[:,0*(var_num+1)])
+                axes[2].plot(output_metrics_tensor[:,0*(var_num+1)],color=batch_colors[k])
                 axes[2].set_title(list(out.keys())[0*(var_num+1)])
-                axes[3].plot(output_metrics_tensor[:,2*(var_num+1)])
+                axes[3].plot(output_metrics_tensor[:,2*(var_num+1)],color=batch_colors[k])
                 axes[3].set_title(list(out.keys())[2*(var_num+1)])
-                axes[4].plot(output_metrics_tensor[:,3*(var_num+1)])
+                axes[4].plot(output_metrics_tensor[:,3*(var_num+1)],color=batch_colors[k])
                 axes[4].set_title(list(out.keys())[3*(var_num+1)])
-                axes[5].plot(output_metrics_tensor[:,4*(var_num+1)])
+                axes[5].plot(output_metrics_tensor[:,4*(var_num+1)],color=batch_colors[k])
                 axes[5].set_title(list(out.keys())[4*(var_num+1)])
                 fig.tight_layout()
 
