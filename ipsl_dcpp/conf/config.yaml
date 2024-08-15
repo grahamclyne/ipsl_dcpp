@@ -1,7 +1,7 @@
 defaults:
   - cluster: jean_zay_v100
   - dataloader: ipsl
-  - module: flow_sub_pixel_elevation_scaled_250_timesteps
+  - module: flow_smoothed_one_layer_sub_pixel
   - override hydra/launcher: submitit_slurm
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none

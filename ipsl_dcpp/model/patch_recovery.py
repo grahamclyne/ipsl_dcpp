@@ -225,7 +225,7 @@ class PatchRecovery4(nn.Module):
         output = self.conv(x)  
         output = self.pixelshuffle(output)  # (batch_size, 34, 144, 144)
         if(self.smoothing):
-            output = self.smooth_conv(output)
+        #    output = self.smooth_conv(output)
             output = self.smooth_conv1(output)
         
         output_surface = output[:,:,:143,:] # crop for irregular
