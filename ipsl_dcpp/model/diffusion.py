@@ -485,6 +485,8 @@ class Diffusion(pl.LightningModule):
                 denormed_batch_surface_ensembles.append(torch.stack(b_denormalized_surface))
             denormed_surface_ensembles = torch.stack(denormed_surface_ensembles).reshape(num_batch_examples,rollout_length,self.num_members,34,143,144)
             denormed_batch_surface_ensembles = torch.stack(denormed_batch_surface_ensembles)
+            print(denormed_surface_ensembles.shape)
+            print(denormed_batch_surface_ensembles.shape)
             for k in range(num_batch_examples):
                 output_metrics = []
                 for i in range(rollout_length):
@@ -505,14 +507,14 @@ class Diffusion(pl.LightningModule):
                         # print(torch.tensor(list(out.values())))
                         
                 output_metrics_tensor = torch.stack(output_metrics)
-                axes[2].plot(output_metrics_tensor[:,0*(var_num+1)],color=batch_colors[k])
-                axes[2].set_title(list(out.keys())[0*(var_num+1)])
-                axes[3].plot(output_metrics_tensor[:,2*(var_num+1)],color=batch_colors[k])
-                axes[3].set_title(list(out.keys())[2*(var_num+1)])
-                axes[4].plot(output_metrics_tensor[:,3*(var_num+1)],color=batch_colors[k])
-                axes[4].set_title(list(out.keys())[3*(var_num+1)])
-                axes[5].plot(output_metrics_tensor[:,4*(var_num+1)],color=batch_colors[k])
-                axes[5].set_title(list(out.keys())[4*(var_num+1)])
+                axes[2].plot(output_metrics_tensor[:,5*(var_num)],color=batch_colors[k])
+                axes[2].set_title(list(out.keys())[5*(var_num)])
+                axes[3].plot(output_metrics_tensor[:,2+ (5*var_num)],color=batch_colors[k])
+                axes[3].set_title(list(out.keys())[2+(5*var_num)])
+                axes[4].plot(output_metrics_tensor[:,3+(5*var_num)],color=batch_colors[k])
+                axes[4].set_title(list(out.keys())[3+(5*var_num)])
+                axes[5].plot(output_metrics_tensor[:,4+(5*var_num)],color=batch_colors[k])
+                axes[5].set_title(list(out.keys())[4+(5*var_num)])
                 fig.tight_layout()
 
                 # axes[6].plot(output_metrics_tensor[:,5])
