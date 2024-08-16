@@ -217,7 +217,7 @@ class PatchRecovery4(nn.Module):
                       upscale_factor=upscale_factor)
         self.smooth_conv = nn.Conv2d(output_dim, output_dim, kernel_size=5, stride=1, padding=2)
         self.smooth_conv1 = nn.Conv2d(output_dim, output_dim, kernel_size=3, stride=1, padding=1)
-
+        self.norm = nn.LayerNorm(output_dim)
         self.conv.weight.data.copy_(weight)   # initialize conv.weight
 
     def forward(self, x):
@@ -225,9 +225,10 @@ class PatchRecovery4(nn.Module):
         output = self.conv(x)  
         output = self.pixelshuffle(output)  # (batch_size, 34, 144, 144)
         if(self.smoothing):
-        #    output = self.smooth_conv(output)
+            output = self.smooth_conv(output)
+            output = self.norm(output)
             output = self.smooth_conv1(output)
-        
+            output = self.norm(output)
         output_surface = output[:,:,:143,:] # crop for irregular
         
         return output_surface

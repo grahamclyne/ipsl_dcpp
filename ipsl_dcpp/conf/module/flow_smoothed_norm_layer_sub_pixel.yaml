@@ -1,4 +1,4 @@
-name: flow_smoothed_one_layer_sub_pixel
+name: flow_smoothed_norm_layer_sub_pixel
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
