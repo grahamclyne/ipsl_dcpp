@@ -1,6 +1,6 @@
 dataset:
   _target_: ipsl_dcpp.model.ipsl_dataset.IPSL_DCPP
-  delta: True
+  delta: ${module.delta}
   normalization: 'climatology'
   generate_statistics: False
   lead_time_months: 1

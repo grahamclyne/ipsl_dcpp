@@ -358,7 +358,7 @@ class Diffusion(pl.LightningModule):
         ipsl_ensemble = []
         batch_timeseries = {'state_surface':[]}
         num_batch_examples = 2
-        batch_colors = ['blue','yellow','black']
+        batch_colors = ['blue','green','black']
         for k in range(0,num_batch_examples):
             for j in range(0,rollout_length):
                 batch = self.dataset.__getitem__((k*118) + j)
@@ -373,7 +373,8 @@ class Diffusion(pl.LightningModule):
                       
         
                         batch['state_constant'] = batch['state_constant'].to(device)
-                        rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = (i+1) * k)
+                        rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i)
+                     #   rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i+ (k*num_batch_examples))
                         rollout['state_surface'] = torch.stack(rollout['state_surface'])
                         rollout_ensemble.append(rollout)
 
@@ -389,10 +390,10 @@ class Diffusion(pl.LightningModule):
         for var_num in range(0,34):
             minimum = 1000
             maximum = -1000
-            fig, axes = plt.subplots(7, figsize=(16, 16))
+            fig, axes = plt.subplots(6, figsize=(16, 16))
             axes = axes.flatten()
             for i in range(len(rollout_ensemble)):
-                axes[0].plot(torch.mean(rollout_ensemble[i]['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).cpu(),color=batch_colors[(i+1)//3])
+                axes[0].plot(torch.mean(rollout_ensemble[i]['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).cpu(),color=batch_colors[i//self.num_members])
                 local_min = torch.mean(rollout_ensemble[i]['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).min().cpu()
                 local_max = torch.mean(rollout_ensemble[i]['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).max().cpu()
                 minimum = minimum if minimum < local_min else local_min
@@ -485,17 +486,18 @@ class Diffusion(pl.LightningModule):
                 denormed_batch_surface_ensembles.append(torch.stack(b_denormalized_surface))
             denormed_surface_ensembles = torch.stack(denormed_surface_ensembles).reshape(num_batch_examples,rollout_length,self.num_members,34,143,144)
             denormed_batch_surface_ensembles = torch.stack(denormed_batch_surface_ensembles)
-            print(denormed_surface_ensembles.shape)
-            print(denormed_batch_surface_ensembles.shape)
+            # print(denormed_surface_ensembles.shape)
+            # print(denormed_batch_surface_ensembles.shape)
             for k in range(num_batch_examples):
+                self.metrics = EnsembleMetrics(dataset=self.dataset).to(device)
                 output_metrics = []
                 for i in range(rollout_length):
-                    # print(denormed_surface_ensembles.shape)
-                    # print(denormed_batch_surface_ensembles.shape)
+                    print(denormed_surface_ensembles.shape)
+                    print(denormed_batch_surface_ensembles.shape)
                     #place holder for number of ensembles 
-                    preds = denormed_surface_ensembles[k,i].unsqueeze(0) #[3,1,34,143,144]
+                    preds = denormed_surface_ensembles[k,i].unsqueeze(0) #[num_ensembles,1,34,143,144]
                     batch = denormed_batch_surface_ensembles[k,i].unsqueeze(0).unsqueeze(1)
-                    # print(preds.shape,batch.shape)
+                    print(preds.shape,batch.shape)
                     self.metrics.update(batch,preds)
                     # print(self.metrics)
                     for metric in [self.metrics]:
@@ -507,6 +509,7 @@ class Diffusion(pl.LightningModule):
                         # print(torch.tensor(list(out.values())))
                         
                 output_metrics_tensor = torch.stack(output_metrics)
+                print(output_metrics_tensor.shape)
                 axes[2].plot(output_metrics_tensor[:,5*(var_num)],color=batch_colors[k])
                 axes[2].set_title(list(out.keys())[5*(var_num)])
                 axes[3].plot(output_metrics_tensor[:,2+ (5*var_num)],color=batch_colors[k])
@@ -568,11 +571,11 @@ class Diffusion(pl.LightningModule):
         inc_time_vec = np.vectorize(inc_time)
         nulls = torch.where(batch['state_surface']==0,1.0,0.0)     
         for i in range(rollout_length):
-            print(batch['time'])
-            print(batch['next_time'])
+       #     print(batch['time'])
+       #     print(batch['next_time'])
             start = time.time()
            # print(batch['state_surface'].shape)
-            print(i,'lead_time')
+        #    print(i,'lead_time')
             sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler=self.scheduler,seed=100000*seed + i)
             next_time = batch['next_time']    
             cur_year_index = int(next_time[0].split('-')[0]) - 1960
@@ -621,7 +624,7 @@ class Diffusion(pl.LightningModule):
                                  solar_forcings=torch.Tensor(self.dataset.solar_forcings[cur_year_index,cur_month_index]).unsqueeze(0).to(device),
                                next_time=inc_time_vec(next_time))
             end = time.time()
-            print(f'sample took {end - start} to run')
+            print(f'sample {i} took {end - start} to run')
         return history
 
     
