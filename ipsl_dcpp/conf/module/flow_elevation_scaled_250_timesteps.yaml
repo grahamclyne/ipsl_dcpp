@@ -4,7 +4,7 @@ surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps'
 depth_variables: ['mrsfl','mrsol','mrsll']
 plev_variables: ['hur','hus','o3','ta','ua','va','wap','zg']
 #batch_size: ${eval:'16 if "${cluster.launcher.slurm_constraint}" == "a100" else 1'} #on a100
-
+delta: True
 batch_size: 8
 z_normalize: False
 flattened_plev: True
@@ -19,7 +19,7 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 2
+  num_inference_steps: 50
   prediction_type: 'v_prediction'
   num_ensemble_members: 2
   p_uncond: 0.0

@@ -310,7 +310,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             if(self.flattened_plev):
                 new_state_plev=batch['next_state_surface'][:,10:].to(device)*self.plev_delta_stds.to(device).unsqueeze(0).reshape(1,8*3,1,1) + batch['state_surface'][:,10:].to(device)
                 new_state_surface = torch.concatenate([new_state_surface,new_state_plev],axis=1)
-
+        else:
+            new_state_surface=batch['next_state_surface']
         if(self.normalization == 'climatology'):
             denorm_surface = lambda x,month_index: x[:,:10]*torch.from_numpy(self.surface_stds[month_index]).to(device) + torch.from_numpy(self.surface_means[month_index]).to(device)
             denorm_plev = lambda x,month_index: x[:,10:]*torch.from_numpy(self.plev_stds[month_index]).to(device).reshape(-1,8*3,143,144) + torch.from_numpy(self.plev_means[month_index]).to(device).reshape(-1,8*3,143,144)

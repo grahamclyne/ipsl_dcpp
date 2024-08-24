@@ -315,17 +315,22 @@ class Diffusion(pl.LightningModule):
             metric.reset()
 
 
-    def test_step(self, batch, batch_nb):
-        self.validation_step(batch,batch_nb)
+    # def test_step(self, batch, batch_nb):
+    #     self.validation_step(batch,batch_nb)
 
-    def on_test_epoch_end(self):
-        for metric in [self.metrics]:
-            out = metric.compute()
-            self.log_dict(out)# dont put on_epoch = True here
-        #    print(out)
-            metric.reset()
+    # def on_test_epoch_end(self):
+    #     for metric in [self.metrics]:
+    #         out = metric.compute()
+    #         self.log_dict(out)# dont put on_epoch = True here
+    #     #    print(out)
+    #         metric.reset()
 
-
+    def test_step(self,batch,batch_nb):
+        out_dir = f'./plots/{self.dataset.plot_output_path}_long_rollout/'
+        os.makedirs(out_dir,exist_ok=True)
+        for ensemble_member in range(0,7):
+            rollout = self.sample_rollout(batch,rollout_length=118*5,seed = ensemble_member)
+            torch.save(torch.stack(rollout['state_surface']),f'{out_dir}/long_rollout_{ensemble_member}.pt')
 
     def predict_step(self,batch,batch_nb):        
         var_names = self.dataset.surface_variables.copy()
