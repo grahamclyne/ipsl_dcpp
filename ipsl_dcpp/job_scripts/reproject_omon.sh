@@ -8,7 +8,7 @@
 #SBATCH --account=mlr@cpu
 cd ${WORK}/ipsl_dcpp/ipsl_dcpp
 
-#source ../miniconda3/etc/profile.d/conda.sh
+source ../miniconda3/etc/profile.d/conda.sh
 conda init bash
 conda activate esmf_test1
 

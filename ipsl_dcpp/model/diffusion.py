@@ -378,8 +378,8 @@ class Diffusion(pl.LightningModule):
                       
         
                         batch['state_constant'] = batch['state_constant'].to(device)
-                        rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i)
-                     #   rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i+ (k*num_batch_examples))
+                     #   rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i)
+                        rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i+ (k*num_batch_examples))
                         rollout['state_surface'] = torch.stack(rollout['state_surface'])
                         rollout_ensemble.append(rollout)
 
@@ -439,7 +439,7 @@ class Diffusion(pl.LightningModule):
                 container.append([line,line1,title])
             if(var_num < 10):
                 plt.title(self.dataset.surface_variables[var_num])
-            writer = animation.FFMpegWriter(fps=100)
+            writer = animation.FFMpegWriter(fps=2)
             ani = animation.ArtistAnimation(fig1, container)
             ani.save(f'{out_dir}/diffusion_comparison_{var_names[var_num][0]}_ffmpeg.gif',writer=writer)
 
@@ -585,12 +585,16 @@ class Diffusion(pl.LightningModule):
             next_time = batch['next_time']    
             cur_year_index = int(next_time[0].split('-')[0]) - 1960
             cur_month_index = int(next_time[0].split('-')[-1]) - 1
-            new_state_surface=sample['next_state_surface'][:,:10].to(device)*self.dataset.surface_delta_stds.to(device).unsqueeze(0) + batch['state_surface'][:,:10].to(device)
+            if(self.dataset.delta):
+                print('delta')
+                new_state_surface=sample['next_state_surface'][:,:10].to(device)*self.dataset.surface_delta_stds.to(device).unsqueeze(0) + batch['state_surface'][:,:10].to(device)
             #sample['next_state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),sample['next_state_surface'][:,9,:,:],torch.nan)
-            assert len(sample['next_state_surface'][:,:10].shape) == len(self.dataset.surface_delta_stds.to(device).unsqueeze(0).shape)
-            if(self.dataset.flattened_plev):
-                new_state_plev=sample['next_state_surface'][:,10:].to(device)*self.dataset.plev_delta_stds.to(device).unsqueeze(0).reshape(1,8*3,1,1) + batch['state_surface'][:,10:].to(device)
-                new_state_surface = torch.concatenate([new_state_surface,new_state_plev],axis=1)
+            #assert len(sample['next_state_surface'][:,:10].shape) == len(self.dataset.surface_delta_stds.to(device).unsqueeze(0).shape)
+                if(self.dataset.flattened_plev):
+                    new_state_plev=sample['next_state_surface'][:,10:].to(device)*self.dataset.plev_delta_stds.to(device).unsqueeze(0).reshape(1,8*3,1,1) + batch['state_surface'][:,10:].to(device)
+                    new_state_surface = torch.concatenate([new_state_surface,new_state_plev],axis=1)
+            else:
+                new_state_surface=sample['next_state_surface']
             # print(self.dataset.ocean_mask.shape)
             # print(new_state_surface.shape)
             
@@ -730,7 +734,7 @@ class Diffusion(pl.LightningModule):
                 #     sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],next_state_level=local_batch['level_noisy'])
                 #else:
             sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],time=batch['time'],next_time=batch['next_time']) 
-       # visualize_denoise(steps[::5],self.dataset)
+        visualize_denoise(steps[::5],self.dataset)
         if denormalize:
             #sample,batch = self.dataset.denormalize(sample, batch)
             pass

@@ -1,4 +1,4 @@
-name: flow_sub_pixel_no_delta_no_smoothing
+name: flow_sub_pixel_no_delta
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
@@ -12,7 +12,7 @@ mask_value: 0
 
 module:
   _target_: ipsl_dcpp.model.diffusion.Diffusion
-  num_diffusion_timesteps: 1000
+  num_diffusion_timesteps: 250
   lr: 3e-4
   weight_decay: 0.01
   betas: [0.9, 0.99]
@@ -52,4 +52,4 @@ backbone:
   depth_ch: 0
   use_skip: False
   cropped: False
-  smoothing: False
+  smoothing: True
