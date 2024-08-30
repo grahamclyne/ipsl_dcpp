@@ -1,4 +1,4 @@
-name: flow_sub_pixel_no_delta
+name: flow_sub_pixel_no_delta_no_smoothing
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
@@ -52,4 +52,4 @@ backbone:
   depth_ch: 0
   use_skip: False
   cropped: False
-  smoothing: True
+  smoothing: False

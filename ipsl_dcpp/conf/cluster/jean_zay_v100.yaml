@@ -1,4 +1,4 @@
-data_path: /gpfsscratch/rech/mlr/udy16au/
+data_path: /lustre/fsn1/projects/rech/mlr/udy16au/
 work_path: /lustre/fswork/projects/rech/mlr/udy16au/ipsl_dcpp/ipsl_dcpp/
 wandb_dir: /lustre/fsn1/projects/rech/mlr/udy16au/model_output/
 wandb_mode: offline

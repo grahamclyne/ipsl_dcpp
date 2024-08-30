@@ -22,7 +22,7 @@ with initialize(version_base=None, config_path="conf"):
     cfg = compose(config_name="config")
 pl.seed_everything(cfg.seed)
 train = hydra.utils.instantiate(
-    cfg.dataloader.dataset,domain='train',debug=False
+    cfg.dataloader.dataset,domain='train',debug=True
 )
 train_loader = torch.utils.data.DataLoader(train, 
                                             batch_size=1,
@@ -57,7 +57,7 @@ out_mapping = {}
 time = '1961-01'
 means = []
 stds = []
-for _ in range(0, 100):
+for _ in range(0, 10):
     print(time)
     vals = []
     indices = [(x[0],x[1]) for x in list(filter(lambda x: time in str(x[2]), ts))]
@@ -65,7 +65,6 @@ for _ in range(0, 100):
     for index in indices:
         vals.append(train.__getitem__(search_by_value(train.id2pt,index))['state_surface'][0])
     output = torch.stack(vals)
-    print(output.shape)
     mean = output.mean()
     std = output.std()
     means.append(mean)
@@ -73,10 +72,9 @@ for _ in range(0, 100):
    # out_mapping[str(ts[time_index*(num_ensembles+1)][2])[:7]] =  torch.stack(vals)
     print(mean,std)
    # print(str(ts[time_index*(num_ensembles+1)][2])[:7])
-import pickle
-mean_file = open('long_means','rb')
-mean_std = open('long_stds','rb')
+mean_file = open('long_means.pt','wb')
+mean_std = open('long_stds.pt','wb')
 
 # source, destination
-pickle.dump(means, mean_file) 
-pickle.dump(stds, mean_std) 
+torch.save(torch.stack(means), mean_file) 
+torch.save(torch.stack(stds), mean_std) 
