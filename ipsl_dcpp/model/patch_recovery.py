@@ -160,11 +160,14 @@ class PatchRecovery3(nn.Module):
        #     nn.Conv2d(4*dim, 4*dim, kernel_size=3, stride=1, padding=1),
        #     GeLU())
         self.cropped = cropped
+        self.norm = nn.LayerNorm((output_dim,144,144))
+
         if(self.cropped):
             self.proj = nn.Conv2d(4*dim, output_dim, kernel_size=1, stride=1, padding=0)
+            
         else:
             self.proj = nn.Conv2d(4*dim, output_dim, kernel_size=(4,5), stride=1, padding=(1,2))
-
+            
         self.soil = soil
         self.plev = plev
         self.output_dim = output_dim
@@ -180,6 +183,7 @@ class PatchRecovery3(nn.Module):
        #     x = self.head2(x)
      #   print('after head',x.shape)
         x = self.proj(x)
+        x = self.norm(x)
      #   print(x.shape)
         #output_surface = x[:, :135]
       #  output = x[:, 135:287].reshape((x.shape[0], 8, 19, *x.shape[-2:]))

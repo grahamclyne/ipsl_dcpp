@@ -1,4 +1,4 @@
-name: flow_elevation_scaled_250_timesteps
+name: flow_conv_head_layernorm
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
@@ -12,14 +12,14 @@ mask_value: 0
 
 module:
   _target_: ipsl_dcpp.model.diffusion.Diffusion
-  num_diffusion_timesteps: 250
+  num_diffusion_timesteps: 1000
   lr: 3e-4
   weight_decay: 0.01
   betas: [0.9, 0.99]
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 75
+  num_inference_steps: 5
   prediction_type: 'v_prediction'
   num_ensemble_members: 1
   p_uncond: 0.0
@@ -31,7 +31,7 @@ backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
   soil: False
   plev: False
-  conv_head: False
+  conv_head: True
   sub_pixel: False
   lon_resolution: 144
   lat_resolution: 143
@@ -51,5 +51,5 @@ backbone:
   #level_ch: 8
   depth_ch: 0
   use_skip: False
-  cropped: False
+  cropped: True
   smoothing: False

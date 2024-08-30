@@ -17,33 +17,6 @@ from copy import deepcopy
 import ffmpeg
 import pathlib
 
-def visualize_denoise(steps,dataset):
-    #visualize denoising proccess
-    from matplotlib import animation
-    import xarray as xr
-    import matplotlib.pyplot as plt
-    ds = xr.open_dataset(dataset.files[0])
-    shell = ds.isel(time=0)
-    fig, axes = plt.subplots(1,1, figsize=(16, 6))
-    steps = np.stack([x.cpu() for x in steps])
-    container = []
-    var_num = 9
-    for time_step in range(len(steps)):
-        # print(np.stack(ensembles[0]['state_surface']).shape)
-        # print(np.stack(ipsl_ensemble[0]['state_surface']).shape)
-        shell['tas'].data = steps[time_step][0][var_num]
-       # line = ax1.pcolormesh(steps[time_step][0,0,0])
-        line = shell['tas'].plot.pcolormesh(ax=axes,add_colorbar=False,vmax=5,vmin=-5)
-        title = axes.text(0.5,1.05,"Diffusion Step {}".format(time_step), 
-                        size=plt.rcParams["axes.titlesize"],
-                        ha="center", transform=axes.transAxes,)
-        axes.set_title('denoise')
-    
-        container.append([line,title])
-    plt.title('')
-    
-    ani = animation.ArtistAnimation(fig, container, interval=300, blit=True)
-    ani.save(f'denoise_{var_num}_epsilon.gif')
 
 
    #  fig, axes = plt.subplots(1,1, figsize=(16, 6))
@@ -416,7 +389,9 @@ class Diffusion(pl.LightningModule):
             axes[0].set_ylabel('Normalized Value')
             axes[1].set_ylabel('Normalized Value')
 
-        
+
+
+            
             ds = xr.open_dataset(self.dataset.files[0])
             shell = ds.isel(time=0)
             fig1, axes1 = plt.subplots(1,2, figsize=(16, 6))
@@ -586,7 +561,7 @@ class Diffusion(pl.LightningModule):
             cur_year_index = int(next_time[0].split('-')[0]) - 1960
             cur_month_index = int(next_time[0].split('-')[-1]) - 1
             if(self.dataset.delta):
-                print('delta')
+                # print('delta')
                 new_state_surface=sample['next_state_surface'][:,:10].to(device)*self.dataset.surface_delta_stds.to(device).unsqueeze(0) + batch['state_surface'][:,:10].to(device)
             #sample['next_state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),sample['next_state_surface'][:,9,:,:],torch.nan)
             #assert len(sample['next_state_surface'][:,:10].shape) == len(self.dataset.surface_delta_stds.to(device).unsqueeze(0).shape)
@@ -617,8 +592,8 @@ class Diffusion(pl.LightningModule):
             # batch['state_surface'][:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),batch['state_surface'][:,10:,:,:],0)
             batch['state_surface'] = torch.where(nulls==1.0,0,batch['state_surface'])
             new_state_surface = torch.where(nulls==1.0,0,new_state_surface)
-            print(batch['state_surface'][0,0].mean())
-            print(batch['state_surface'][0,9].mean())
+            # print(batch['state_surface'][0,0].mean())
+            # print(batch['state_surface'][0,9].mean())
             # print(new_state_surface[:,9,:,:].shape)
             history['next_state_surface'].append(new_state_surface)
             history['state_surface'].append(batch['state_surface'])
@@ -633,7 +608,7 @@ class Diffusion(pl.LightningModule):
                                  solar_forcings=torch.Tensor(self.dataset.solar_forcings[cur_year_index,cur_month_index]).unsqueeze(0).to(device),
                                next_time=inc_time_vec(next_time))
             end = time.time()
-            print(f'sample {i} took {end - start} to run')
+            # print(f'sample {i} took {end - start} to run')
         return history
 
     
@@ -734,7 +709,6 @@ class Diffusion(pl.LightningModule):
                 #     sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],next_state_level=local_batch['level_noisy'])
                 #else:
             sample = dict(next_state_surface=local_batch['surface_noisy'],state_surface=local_batch['state_surface'],time=batch['time'],next_time=batch['next_time']) 
-        visualize_denoise(steps[::5],self.dataset)
         if denormalize:
             #sample,batch = self.dataset.denormalize(sample, batch)
             pass

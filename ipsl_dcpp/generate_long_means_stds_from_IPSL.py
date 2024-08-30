@@ -27,7 +27,7 @@ train = hydra.utils.instantiate(
 train_loader = torch.utils.data.DataLoader(train, 
                                             batch_size=1,
                                             num_workers=0,
-                                            shuffle=True) 
+                                            shuffle=False) 
 ts = train.timestamps.copy()
 
 import datetime
@@ -57,7 +57,7 @@ out_mapping = {}
 time = '1961-01'
 means = []
 stds = []
-for _ in range(0, 500):
+for _ in range(0, 100):
     print(time)
     vals = []
     indices = [(x[0],x[1]) for x in list(filter(lambda x: time in str(x[2]), ts))]
@@ -74,8 +74,8 @@ for _ in range(0, 500):
     print(mean,std)
    # print(str(ts[time_index*(num_ensembles+1)][2])[:7])
 import pickle
-mean_file = open('long_means', 'ab')
-mean_std = open('long_stds', 'ab')
+mean_file = open('long_means','rb')
+mean_std = open('long_stds','rb')
 
 # source, destination
 pickle.dump(means, mean_file) 
