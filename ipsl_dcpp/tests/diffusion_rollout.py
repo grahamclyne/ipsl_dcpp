@@ -4,8 +4,6 @@ from hydra import compose, initialize
 import pickle
 import hydra
 import os
-import numpy as np
-import pandas as pd
 
 with initialize(version_base=None, config_path="../conf"):
     cfg = compose(config_name="config")

@@ -2,7 +2,6 @@ import xarray as xr
 import matplotlib.pyplot as plt 
 import os 
 from matplotlib import animation
-import ffmpeg
 import torch
 from matplotlib.colors import TwoSlopeNorm
 
@@ -57,7 +56,7 @@ def make_gif(
 
     # plt.title(var_name)
     # tx = axes[0].set_title('Frame 0')
-    colorbar = fig.colorbar(line, ax=axes[1])
+   # colorbar = fig.colorbar(line, ax=axes[1])
     # def animate(i):
     #     arr = container[0][0]
     #     im = arr        

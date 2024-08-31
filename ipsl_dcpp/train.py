@@ -3,13 +3,11 @@ import hydra
 import torch
 import wandb
 import lightning.pytorch as pl
-from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch.callbacks import ModelCheckpoint,TQDMProgressBar
-import submitit
 import os
 import omegaconf
 from pathlib import Path
 import signal
+
 try:
     OmegaConf.register_new_resolver("eval", eval)
 except:
@@ -181,10 +179,6 @@ def main(cfg: DictConfig):
     
     import uuid
     run_id = str(uuid.uuid4()).split('-')[0]
-
-#    scratch_dir = os.environ['SCRATCH']
-    work_dir = os.environ['WORK']
-
 
     main_node = int(os.environ.get('SLURM_PROCID', 0)) == 0
     print('is main node', main_node)

@@ -2,12 +2,8 @@
 import submitit
 import hydra
 from omegaconf import DictConfig
-from hydra.core.hydra_config import HydraConfig
-from datetime import datetime
-from pathlib import Path
 
 from omegaconf import OmegaConf
-from omegaconf import open_dict
 
 try:
     OmegaConf.register_new_resolver("eval", eval)

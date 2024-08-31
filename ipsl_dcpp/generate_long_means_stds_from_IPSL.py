@@ -1,18 +1,9 @@
-#from ipsl_dcpp.model.ipsl_dataset import IPSL_DCPP
 import torch
 import lightning as pl
-#from ipsl_dcpp.model.pangu import PanguWeather
 from hydra import compose, initialize
-from omegaconf import OmegaConf
-import numpy as np
 import hydra
-import os
-import pickle
-import io
-import numpy as np
-from matplotlib import animation
-import xarray as xr 
-import matplotlib.pyplot as plt 
+import datetime
+
 #os.environ['SLURM_NTASKS_PER_NODE'] = '1'
 #torch.set_default_dtype(torch.float32)
 # os.environ["CUDA_VISIBLE_DEVICES"]=""
@@ -22,7 +13,7 @@ with initialize(version_base=None, config_path="conf"):
     cfg = compose(config_name="config")
 pl.seed_everything(cfg.seed)
 train = hydra.utils.instantiate(
-    cfg.dataloader.dataset,domain='train',debug=True
+    cfg.dataloader.dataset,domain='train',debug=False
 )
 train_loader = torch.utils.data.DataLoader(train, 
                                             batch_size=1,
@@ -30,7 +21,6 @@ train_loader = torch.utils.data.DataLoader(train,
                                             shuffle=False) 
 ts = train.timestamps.copy()
 
-import datetime
 def inc_time(batch_time):
     batch_time = datetime.datetime.strptime(batch_time,'%Y-%m')
     if(batch_time.month == 12):
@@ -46,7 +36,6 @@ def inc_time(batch_time):
 
 ts.sort(key=lambda tup: tup[2])
 def search_by_value(d, search_value):
-    found_keys = []
     for key,value in d.items():
         if value == search_value:
             return key
@@ -57,13 +46,14 @@ out_mapping = {}
 time = '1961-01'
 means = []
 stds = []
-for _ in range(0, 10):
+for _ in range(0, 590):
     print(time)
     vals = []
     indices = [(x[0],x[1]) for x in list(filter(lambda x: time in str(x[2]), ts))]
     time=inc_time(time)
     for index in indices:
         vals.append(train.__getitem__(search_by_value(train.id2pt,index))['state_surface'][0])
+    
     output = torch.stack(vals)
     mean = output.mean()
     std = output.std()

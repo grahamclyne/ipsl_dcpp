@@ -93,9 +93,9 @@ class IPSL_DCPP(torch.utils.data.Dataset):
           #  self.depth_means = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/depth_means.npy'),(-3,-2,-1)),(3,11,143,144))
            # self.depth_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/depth_stds.npy'),(-3,-2,-1)),(3,11,143,144))
         elif(self.normalization == 'spatial_normal'):
-            self.surface_means = np.load(f'{self.data_path}/reference_data/spatial_multi_var_surface_means.npy').squeeze()[variable_subset]
+            self.surface_means = np.load(f'{self.data_path}/reference_data/spatial_multi_var_surface_means.npy').squeeze()
             #print(self.surface_means.shape)
-            self.surface_stds = np.nanmean(np.load(f'{self.data_path}/reference_data/spatial_multi_var_surface_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)[variable_subset]
+            self.surface_stds = np.nanmean(np.load(f'{self.data_path}/reference_data/spatial_multi_var_surface_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
            # print(self.surface_stds.shape)
             self.depth_means = np.load(f'{self.data_path}/reference_data/spatial_depth_means.npy').squeeze()
             self.depth_stds = np.nanmean(np.load(f'{self.data_path}/reference_data/spatial_depth_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)

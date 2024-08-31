@@ -2,9 +2,6 @@ import xarray
 import os 
 store_dir = os.environ['STORE']
 scratch_dir = os.environ['SCRATCH']
-import xmip
-import numpy as np
-import rioxarray
 
 def convert_to_joined_numpy(year,variation):
 

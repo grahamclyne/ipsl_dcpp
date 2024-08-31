@@ -51,7 +51,7 @@ def scp_copy_with_jump(jump_host, source_host, source_path, destination_host, de
                             source_conn.run(f'zip -j {archive_name}.zip -@ < /home/gclyne/source_paths.txt')
                             dest_conn.run(f'scp -i ~/.ssh/priv_rsa {source_host}:{archive_name}.zip {dest_file_path}')
                             source_conn.run(f'rm {archive_name}.zip')    
-                            source_conn.run(f'rm /home/gclyne/source_paths.txt')
+                            source_conn.run('rm /home/gclyne/source_paths.txt')
                             dest_conn.run(f'unzip {dest_file_path}/{archive_name}.zip -d {dest_file_path}')
 
 if __name__ == "__main__":

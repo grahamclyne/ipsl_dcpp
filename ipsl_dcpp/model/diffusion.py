@@ -1,21 +1,16 @@
 import lightning.pytorch as pl
 import diffusers
 import torch
-import wandb
 from ipsl_dcpp.model.pangu import TimestepEmbedder
 from ipsl_dcpp.evaluation.metrics import EnsembleMetrics
 import datetime
 import numpy as np
 import time
-import pandas as pd
 import os 
-import pickle
 import matplotlib.pyplot as plt
 import xarray as xr
 from matplotlib import animation
 from copy import deepcopy
-import ffmpeg
-import pathlib
 
 
 
@@ -132,9 +127,6 @@ class Diffusion(pl.LightningModule):
             self.log(mode+k, v, prog_bar=True,sync_dist=True)
 
     def forward(self, batch, timesteps, sel=1):
-        bs = batch['state_surface'].shape[0]
-       # print(batch['state_surface'].shape)
-       # print(batch['prev_state_surface'].shape)
         device = batch['state_surface'].device
         if(self.elevation):
             batch['state_surface'] = torch.cat([batch['state_surface']*sel,batch['prev_state_surface']*sel, 
@@ -198,7 +190,7 @@ class Diffusion(pl.LightningModule):
             # Add noise according to flow matching.
             sigmas = get_sigmas(timesteps, n_dim=batch['next_state_surface'].ndim, dtype=batch['next_state_surface'].dtype)
             
-            batch['surface_noisy'] = noisy_surface_input = sigmas * surface_noise + (1.0 - sigmas) * batch['next_state_surface']
+            batch['surface_noisy'] = sigmas * surface_noise + (1.0 - sigmas) * batch['next_state_surface']
           #  batch['level_noisy'] = noisy_level_input = sigmas * level_noise + (1.0 - sigmas) * batch['next_state_level']
 
             target_surface = surface_noise - batch['next_state_surface']
@@ -207,7 +199,7 @@ class Diffusion(pl.LightningModule):
             batch['surface_noisy'] = self.noise_scheduler.add_noise(batch['next_state_surface'], surface_noise, timesteps)
             batch['surface_noisy'] = self.noise_scheduler.scale_model_input(batch['surface_noisy'])
             if(self.backbone.plev):
-                level_noise = troch.randn_like(batch['next_state_level'])
+                level_noise = torch.randn_like(batch['next_state_level'])
                 batch['level_noisy'] = self.noise_scheduler.add_noise(batch['level_noisy'], level_noise,timesteps)
                 batch['level_noisy'] = self.noise_scheduler.scale_model_input(batch['level_noisy'])
             if self.noise_scheduler.config.prediction_type == "epsilon":
@@ -423,15 +415,11 @@ class Diffusion(pl.LightningModule):
             
             #calculate and plot sss and crps for timeseries
             #denormalize
-            batch_denormed = []
             denormed_surface_ensembles = []
             denormed_batch_surface_ensembles = []
-            denormed_plev_ensembles = []
-            denormed_batch_plev_ensembles = []
             for i in range(num_batch_examples):
                 month_index = 0
                 denormalized_surface = []
-                denormalized_plev = []
                 b_denormalized_surface = []
                 batch_denormed_plev = []
                 for index in range(rollout_length):
@@ -551,64 +539,33 @@ class Diffusion(pl.LightningModule):
         inc_time_vec = np.vectorize(inc_time)
         nulls = torch.where(batch['state_surface']==0,1.0,0.0)     
         for i in range(rollout_length):
-       #     print(batch['time'])
-       #     print(batch['next_time'])
             start = time.time()
-           # print(batch['state_surface'].shape)
-        #    print(i,'lead_time')
             sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler=self.scheduler,seed=100000*seed + i)
             next_time = batch['next_time']    
             cur_year_index = int(next_time[0].split('-')[0]) - 1960
             cur_month_index = int(next_time[0].split('-')[-1]) - 1
             if(self.dataset.delta):
-                # print('delta')
                 new_state_surface=sample['next_state_surface'][:,:10].to(device)*self.dataset.surface_delta_stds.to(device).unsqueeze(0) + batch['state_surface'][:,:10].to(device)
-            #sample['next_state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),sample['next_state_surface'][:,9,:,:],torch.nan)
-            #assert len(sample['next_state_surface'][:,:10].shape) == len(self.dataset.surface_delta_stds.to(device).unsqueeze(0).shape)
                 if(self.dataset.flattened_plev):
                     new_state_plev=sample['next_state_surface'][:,10:].to(device)*self.dataset.plev_delta_stds.to(device).unsqueeze(0).reshape(1,8*3,1,1) + batch['state_surface'][:,10:].to(device)
                     new_state_surface = torch.concatenate([new_state_surface,new_state_plev],axis=1)
             else:
                 new_state_surface=sample['next_state_surface']
-            # print(self.dataset.ocean_mask.shape)
-            # print(new_state_surface.shape)
-            
-            # new_state_surface[:,1,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,1,:,:],0)
-            # new_state_surface[:,2,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,2,:,:],0)
-            # new_state_surface[:,3,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,3,:,:],0)
-            # new_state_surface[:,4,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,4,:,:],0)
-            # new_state_surface[:,6,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,6,:,:],0)
-            # new_state_surface[:,7,:,:] = torch.where(self.dataset.land_mask.to(device),new_state_surface[:,7,:,:],0)
-            # new_state_surface[:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),new_state_surface[:,9,:,:],0)
-            # new_state_surface[:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),new_state_surface[:,10:,:,:],0)
-            
-            # batch['state_surface'][:,1,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,1,:,:],0)
-            # batch['state_surface'][:,2,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,2,:,:],0)
-            # batch['state_surface'][:,3,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,3,:,:],0)
-            # batch['state_surface'][:,4,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,4,:,:],0)
-            # batch['state_surface'][:,6,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,6,:,:],0)
-            # batch['state_surface'][:,7,:,:] = torch.where(self.dataset.land_mask.to(device),batch['state_surface'][:,7,:,:],0)
-            # batch['state_surface'][:,9,:,:] = torch.where(~self.dataset.ocean_mask.to(device),batch['state_surface'][:,9,:,:],0)
-            # batch['state_surface'][:,10:,:,:] = torch.where(self.dataset.plev_mask.to(device),batch['state_surface'][:,10:,:,:],0)
             batch['state_surface'] = torch.where(nulls==1.0,0,batch['state_surface'])
             new_state_surface = torch.where(nulls==1.0,0,new_state_surface)
-            # print(batch['state_surface'][0,0].mean())
-            # print(batch['state_surface'][0,9].mean())
-            # print(new_state_surface[:,9,:,:].shape)
             history['next_state_surface'].append(new_state_surface)
             history['state_surface'].append(batch['state_surface'])
             batch = dict(state_surface=new_state_surface,
                          prev_state_surface=batch['state_surface'],
-                               #state_level=denorm_sample['next_state_level'],
-                             #  next_state_surface=batch['next_state_surface'],
-                               time=next_time,
-                               state_constant=batch['state_constant'],
-                                 forcings=torch.Tensor(self.dataset.atmos_forcings[:,cur_year_index]).unsqueeze(0).to(device), #I have no idea why i need to unsqueeze here does lightning add a dimenions with the batch? who knows
-                                 state_depth=torch.empty(0),
-                                 solar_forcings=torch.Tensor(self.dataset.solar_forcings[cur_year_index,cur_month_index]).unsqueeze(0).to(device),
-                               next_time=inc_time_vec(next_time))
+                         time=next_time,
+                         state_constant=batch['state_constant'],
+                         forcings=torch.Tensor(self.dataset.atmos_forcings[:,cur_year_index]).unsqueeze(0).to(device), #I have no idea why i need to unsqueeze here does lightning add a dimenions with the batch? who knows
+                         state_depth=torch.empty(0),
+                         solar_forcings=torch.Tensor(self.dataset.solar_forcings[cur_year_index,cur_month_index]).unsqueeze(0).to(device),
+                         next_time=inc_time_vec(next_time)
+                        )
             end = time.time()
-            # print(f'sample {i} took {end - start} to run')
+            print(f'sample {i} took {end - start} to run')
         return history
 
     
@@ -654,7 +611,7 @@ class Diffusion(pl.LightningModule):
         surface_noise = torch.randn(local_batch['state_surface'].size(), generator=generator)
         local_batch['surface_noisy'] = surface_noise.to(self.device)
         if(self.backbone.plev):
-            level_noise = torch.randn_like(batch['next_state_level'])
+           # level_noise = torch.randn_like(batch['next_state_level'])
             local_batch['level_noisy'] = surface_noise.to(self.device)
         steps = []
         with torch.no_grad():

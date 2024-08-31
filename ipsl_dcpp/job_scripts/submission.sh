@@ -14,11 +14,11 @@ if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
     exit
 fi
 
-cd $SCRATCH
+cd $NEWSCRATCH
 
 main() {
     #need to load 
-    cd $SCRATCH
+    cd $NEWSCRATCH
     if [[ "$gpu_version" == "a100" ]]; then
         module load cpuarch/amd
     fi

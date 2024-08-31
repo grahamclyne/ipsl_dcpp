@@ -1,12 +1,11 @@
-import numpy as np
-import xarray as xr 
 from hydra import compose, initialize
-from omegaconf import OmegaConf
 import lightning as pl
 import hydra
 import torch
 import glob
 import os 
+from visualization_utils import make_gif
+
 # ds = xr.open_dataset('/lustre/fsn1/projects/rech/mlr/udy16au/batch_with_tos/1984_2_tos_included.nc')
 # shell = ds.isel(time=4)['tas']
 # clim_means = np.load('/lustre/fsn1/projects/rech/mlr/udy16au/reference_data/climatology_surface_means_ensemble_split.npy')
@@ -67,7 +66,6 @@ ipsl_ensemble = torch.stack(batch_timeseries['state_surface'])
 # print(rollout_data[:,0,0,:,:].shape)
 data = torch.stack([ipsl_ensemble[:,0,:,:],rollout_data[:,0,0,:,:].to('cpu')])
 print(data.shape)
-from visualization_utils import make_gif
 make_gif(
     data,
     rollout_length,

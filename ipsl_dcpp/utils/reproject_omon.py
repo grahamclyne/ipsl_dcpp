@@ -1,4 +1,3 @@
-import esmpy
 import xesmf as xe
 import xarray as xr
 
