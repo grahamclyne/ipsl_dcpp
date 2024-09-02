@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 import xarray as xr
 from matplotlib import animation
 from copy import deepcopy
-
+from ipsl_dcpp.utils.visualization_utils import make_gif,el_nino_34_index
+from pathlib import Path
 
 
    #  fig, axes = plt.subplots(1,1, figsize=(16, 6))
@@ -73,6 +74,7 @@ class Diffusion(pl.LightningModule):
         num_ensemble_members,
         p_uncond,
         num_rollout_steps,
+        num_batch_examples,
         scheduler,
         elevation
     ):
@@ -88,6 +90,7 @@ class Diffusion(pl.LightningModule):
         self.scheduler = scheduler
         self.num_members = num_ensemble_members
         self.num_rollout_steps = num_rollout_steps
+        self.num_batch_examples = num_batch_examples
         self.elevation = elevation
         if scheduler == 'ddpm':
             self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_diffusion_timesteps,
@@ -298,6 +301,8 @@ class Diffusion(pl.LightningModule):
             torch.save(torch.stack(rollout['state_surface']),f'{out_dir}/long_rollout_{ensemble_member}.pt')
 
     def predict_step(self,batch,batch_nb):        
+
+        #make variable names for output
         var_names = self.dataset.surface_variables.copy()
         plev_var_names = [[x+'_850',x+'_750',x+'_500'] for x in self.dataset.plev_variables]
         for x in plev_var_names:
@@ -307,177 +312,140 @@ class Diffusion(pl.LightningModule):
         
         #only do rollout for every beginning of year
         device = batch['state_surface'].device
-        # print(self.dataset.files)
-        # print(self.dataset.id2pt)
-        # print(len(self.dataset.id2pt))
-        # print(self.dataset.timestamps)
-        # print(batch['time'])
-        # print(device)
-        # if(int(batch['time'][0].split('-')[-1]) != 2): #check if beginning ?? does this work ? 
-        #     return
-        #out_dir = f'{self.dataset.data_path}/plots_'
-
         out_dir = f'./plots/{self.dataset.plot_output_path}/'
         os.makedirs(out_dir,exist_ok=True)
-        rollout_length = self.num_rollout_steps    #no greater than 118 please
-
-        # for i in range(self.num_members):
-            
-        #     rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i)
-        rollout_ensemble = []
         ipsl_ensemble = []
-        batch_timeseries = {'state_surface':[]}
-        num_batch_examples = 2
+        num_batch_examples = self.num_batch_examples
         batch_colors = ['blue','green','black']
-        for k in range(0,num_batch_examples):
-            for j in range(0,rollout_length):
+        rollout_ensemble = []
+
+        for k in range(0,self.num_batch_examples):
+            batch_timeseries = []
+            for j in range(0,self.num_rollout_steps):
                 batch = self.dataset.__getitem__((k*118) + j)
-                batch_timeseries['state_surface'].append(batch['state_surface'])
+                batch_timeseries.append(batch['state_surface'])
                 if(j == 0):
                     batch = {k:[batch[k]] if k == 'time' or k == 'next_time' else batch[k].unsqueeze(0) for k in batch.keys()}  #simulate lightnings batching dimension
                     batch['state_surface'] = batch['state_surface'].to(device)
                     batch['prev_state_surface'] = batch['prev_state_surface'].to(device)
                     batch['forcings'] = batch['forcings'].to(device)
                     batch['solar_forcings'] = batch['solar_forcings'].to(device)#make n for each batch, could do experiments for different num per batch
+                    rollout_members = []
                     for i in range(0,self.num_members):
-                      
-        
                         batch['state_constant'] = batch['state_constant'].to(device)
                      #   rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i)
-                        rollout = self.sample_rollout(batch,rollout_length=rollout_length,seed = i+ (k*num_batch_examples))
-                        rollout['state_surface'] = torch.stack(rollout['state_surface'])
-                        rollout_ensemble.append(rollout)
+                        rollout = self.sample_rollout(batch,rollout_length=self.num_rollout_steps,seed = i+ (k*num_batch_examples))
+                        rollout_members.append(torch.stack(rollout['state_surface']))
+            rollout_ensemble.append(torch.stack(rollout_members))
+            ipsl_ensemble.append(torch.stack(batch_timeseries))
+        ipsl_ensemble = torch.stack(ipsl_ensemble)
+        rollout_ensemble = torch.stack(rollout_ensemble).cpu()
 
-            batch_timeseries['state_surface'] = torch.stack(batch_timeseries['state_surface'])
-          #  batch_timeseries['state_surface'] = torch.where(batch_timeseries['state_surface']==100,0,batch_timeseries['state_surface'])
+        print(rollout_ensemble.shape)
+        print(ipsl_ensemble.shape)
 
-            ipsl_ensemble.append(batch_timeseries)
-            batch_timeseries = {'state_surface':[]}  
-        ipsl_ensemble = np.stack(ipsl_ensemble) 
+        #some rejigging of the shapes 
+        rollout_ensemble = rollout_ensemble.squeeze(3)
+        ipsl_ensemble = ipsl_ensemble.unsqueeze(1)
+        ipsl_ensemble = ipsl_ensemble.expand(-1,self.num_ensemble_members,-1,-1,-1,-1) # this doubles the "member" dimension to match rollout and make it stackable, is this too big of a waste of space ? 
+
+        data = torch.stack([ipsl_ensemble,rollout_ensemble])
+        
+        #shape is now [[batch,pred],num_batch_examples (diff IC), num_members, rollout_length,var,lat,lon]
+        print(data.shape)
 
 
 
-        for var_num in range(0,34):
-            minimum = 1000
-            maximum = -1000
+
+
+        
+        #make plots for each variable in the set
+        for var_num in range(0,1):
             fig, axes = plt.subplots(6, figsize=(16, 16))
             axes = axes.flatten()
-            for i in range(len(rollout_ensemble)):
-                axes[0].plot(torch.mean(rollout_ensemble[i]['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).cpu(),color=batch_colors[i//self.num_members])
-                local_min = torch.mean(rollout_ensemble[i]['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).min().cpu()
-                local_max = torch.mean(rollout_ensemble[i]['state_surface'][:rollout_length,0,var_num],axis=(-1,-2)).max().cpu()
-                minimum = minimum if minimum < local_min else local_min
-                maximum = maximum if maximum > local_max else local_max
-            for i in range(len(ipsl_ensemble)):
-                axes[1].plot(torch.nanmean(ipsl_ensemble[i]['state_surface'][:rollout_length,var_num],axis=(-1,-2)).cpu(),color=batch_colors[i])
-            local_min = torch.mean(ipsl_ensemble[0]['state_surface'][:rollout_length,var_num],axis=(-1,-2)).min().cpu() 
-            local_max = torch.mean(ipsl_ensemble[0]['state_surface'][:rollout_length,var_num],axis=(-1,-2)).max().cpu()
-            minimum = minimum if minimum < local_min else local_min
-            maximum = maximum if maximum > local_max else local_max
+
+
+            
+            #make plot of actual output and compare
+            minimum = torch.min(torch.mean(data[:,:,:,:,var_num],axis=(-1,-2)))
+            maximum = torch.max(torch.mean(data[:,:,:,:,var_num],axis=(-1,-2)))
+            print(minimum, maximum)
+            for ic_index in range(num_batch_examples):
+                for member_index in range(self.num_members): 
+                    means = torch.mean(data[1,ic_index,member_index,:,var_num],axis=(-1,-2)) 
+                    axes[0].plot(means,color=batch_colors[member_index//self.num_members])
+                axes[1].plot(torch.mean(data[0,ic_index,0,:,var_num],axis=(-1,-2)),color=batch_colors[ic_index])
             axes[0].set_ylim(minimum,maximum)
             axes[1].set_ylim(minimum,maximum)
             axes[0].set_title('Predicted')
             axes[1].set_title('IPSL')
-            axes[0].set_ylabel('Normalized Value')
-            axes[1].set_ylabel('Normalized Value')
-
-
+            axes[0].set_ylabel(f'Normalized Value')
+            #axes[1].set_ylabel(f'Normalized {var_names[var_num]} Value')
 
             
-            ds = xr.open_dataset(self.dataset.files[0])
-            shell = ds.isel(time=0)
-            fig1, axes1 = plt.subplots(1,2, figsize=(16, 6))
-            axes1 = axes1.flatten()
-            container = []
-            for time_step in range(rollout_length):
-                # print(np.stack(ensembles[0]['state_surface']).shape)
-                # print(np.stack(ipsl_ensemble[0]['state_surface']).shape)
-                shell['tas'].data = rollout_ensemble[0]['state_surface'][time_step][0][var_num].cpu()
-                   # line = ax1.pcolormesh(steps[time_step][0,0,0])
-                line = shell['tas'].plot.pcolormesh(ax=axes1[0],add_colorbar=False)
-                shell['tas'].data = ipsl_ensemble[0]['state_surface'][time_step][var_num].cpu()
-                line1 = shell['tas'].plot.pcolormesh(ax=axes1[1],add_colorbar=False)
-                title = axes1[0].text(0.5,1.05,"Diffusion Step {}".format(time_step), 
-                                size=plt.rcParams["axes.titlesize"],
-                                ha="center", transform=axes1[0].transAxes,)
-                axes1[0].set_title('Predicted')
-                axes1[1].set_title('IPSL')
-            
-                container.append([line,line1,title])
-            if(var_num < 10):
-                plt.title(self.dataset.surface_variables[var_num])
-            writer = animation.FFMpegWriter(fps=2)
-            ani = animation.ArtistAnimation(fig1, container)
-            ani.save(f'{out_dir}/diffusion_comparison_{var_names[var_num][0]}_ffmpeg.gif',writer=writer)
-
-
+            #make gif of only one IC
+            make_gif(
+                    data=data[:,0,0,:,var_num],
+                    rollout_length=self.num_rollout_steps,
+                    var_name=var_names[var_num],
+                    file_name=f'{out_dir}/normalized_diffusion_comparison_{var_names[var_num][0]}_ffmpeg',
+                    save=True
+            )
 
             
-            #calculate and plot sss and crps for timeseries
-            #denormalize
+            #denormalize, this is different from the denorm function in the IPSL_DATASET class as it does not consider dictionary of 'state_surface', should this be a function as well? 
             denormed_surface_ensembles = []
             denormed_batch_surface_ensembles = []
-            for i in range(num_batch_examples):
+            for ic_index in range(num_batch_examples):
                 month_index = 0
+                batch_denormalized = []
                 denormalized_surface = []
-                b_denormalized_surface = []
-                batch_denormed_plev = []
-                for index in range(rollout_length):
-               # for index in range(len(ensembles[i]['state_surface'])-2):
-                    denorm_surface = lambda x,month_index: x[:10].to(device)*torch.tensor(self.dataset.surface_stds[month_index]).to(device) + torch.tensor(self.dataset.surface_means[month_index]).to(device)
-                    denorm_plev = lambda x,month_index: x[10:].to(device)*torch.tensor(self.dataset.plev_stds[month_index]).reshape(8*3,143,144).to(device) + torch.tensor(self.dataset.plev_means[month_index]).reshape(8*3,143,144).to(device)
-                   # if(cfg.dataloader.flattened_plev):
-            #        print(ensembles[i]['state_surface'][index].shape)
-             #       print(ipsl_ensemble[i]['state_surface'][index].shape)
-                    # print(rollout_ensemble[i]['state_surface'][index].shape)
-                    # print(ipsl_ensemble[i]['state_surface'][index].shape)
-                    if(self.dataset.flattened_plev):
-                        batch_denormed_plev = denorm_plev(torch.Tensor(ipsl_ensemble[i]['state_surface'][index]),month_index)
+                for rollout_index in range(self.num_rollout_steps):
+                    #denormalize batch
+                    batch_denormed_surface = self.dataset.denorm_surface_variables(
+                        data[None,1,ic_index,0,rollout_index],month_index)
+                    batch_denormed_plev = self.dataset.denorm_plev_variables(
+                        data[None,1,ic_index,0,rollout_index],month_index)
+                    batch_denormalized.append(torch.concatenate([batch_denormed_surface,batch_denormed_plev],axis=1))
                     
-                    batch_denormed_surface = denorm_surface(torch.Tensor(ipsl_ensemble[i]['state_surface'][index]),month_index)
-
-                    # print(denormed_surface.shape)
-                    # print(denormed_plev.shape)
-                    b_denormalized_surface.append(torch.concatenate([batch_denormed_surface,batch_denormed_plev],axis=0))     
-                    for k in range(self.num_members):
-                        denormed_plev = denorm_plev(rollout_ensemble[(i+1) * k]['state_surface'][index][0],month_index) #[0] here to remove batch index
-                        denormed_surface = denorm_surface(rollout_ensemble[(i+1) * k]['state_surface'][index][0],month_index)
-                        denormalized_surface.append(torch.concatenate([denormed_surface,denormed_plev],axis=0))
-
+                    for member_index in range(self.num_members):
+                        
+                        denormed_plev = self.dataset.denorm_plev_variables(
+                            data[None,0,ic_index,member_index,rollout_index],month_index
+                        ) 
+                        denormed_surface = self.dataset.denorm_surface_variables(
+                            data[None,0,ic_index,member_index,rollout_index],month_index
+                        )
+                        denormalized_surface.append(torch.concatenate([denormed_surface,denormed_plev],axis=1))
                     if(month_index == 11):
                         month_index = 0
                     else:
                         month_index += 1
-                # denormed_surface_ensembles.append(torch.stack(denormalized_surface))
-                # denormed_batch_surface_ensembles.append(torch.stack(batch_denormed_surface))
                 denormed_surface_ensembles.append(torch.stack(denormalized_surface))
-                denormed_batch_surface_ensembles.append(torch.stack(b_denormalized_surface))
-            denormed_surface_ensembles = torch.stack(denormed_surface_ensembles).reshape(num_batch_examples,rollout_length,self.num_members,34,143,144)
-            denormed_batch_surface_ensembles = torch.stack(denormed_batch_surface_ensembles)
-            # print(denormed_surface_ensembles.shape)
-            # print(denormed_batch_surface_ensembles.shape)
-            for k in range(num_batch_examples):
-                self.metrics = EnsembleMetrics(dataset=self.dataset).to(device)
+                denormed_batch_surface_ensembles.append(torch.stack(batch_denormalized))
+            denormed_surface_ensembles = torch.stack(denormed_surface_ensembles).reshape(num_batch_examples,self.num_members,self.num_rollout_steps,34,143,144)
+            denormed_batch_surface_ensembles = torch.stack(denormed_batch_surface_ensembles).reshape(num_batch_examples,1,self.num_rollout_steps,34,143,144).expand(-1,self.num_ensemble_members,-1,-1,-1,-1)
+
+
+            #should be same shape as normed data: [[batch,pred],num_batch_examples (diff IC), num_members, rollout_length,var,lat,lon]
+            denormed_data = torch.stack([denormed_batch_surface_ensembles,denormed_surface_ensembles])
+            
+            #calculate and plot sss and crps for timeseries
+            for ic_index in range(num_batch_examples):
+                self.metrics = EnsembleMetrics(dataset=self.dataset).cpu()
                 output_metrics = []
-                for i in range(rollout_length):
-                    print(denormed_surface_ensembles.shape)
-                    print(denormed_batch_surface_ensembles.shape)
-                    #place holder for number of ensembles 
-                    preds = denormed_surface_ensembles[k,i].unsqueeze(0) #[num_ensembles,1,34,143,144]
-                    batch = denormed_batch_surface_ensembles[k,i].unsqueeze(0).unsqueeze(1)
-                    print(preds.shape,batch.shape)
-                    self.metrics.update(batch,preds)
-                    # print(self.metrics)
+                for rollout_index in range(self.num_rollout_steps):
+                    #needs to be [1, num_pred_members_per_sample (should be 1 for batch), variables, lat, lon]
+                    self.metrics.update(
+                        denormed_data[None,0,ic_index,0,rollout_index],
+                        denormed_data[None,1,ic_index,:,rollout_index]
+                    )
                     for metric in [self.metrics]:
                         out = metric.compute()
-                       # self.log_dict(out)# dont put on_epoch = True here
-                        # print(out)
                         metric.reset()
                         output_metrics.append(torch.tensor(list(out.values())))
-                        # print(torch.tensor(list(out.values())))
                         
                 output_metrics_tensor = torch.stack(output_metrics)
-                print(output_metrics_tensor.shape)
                 axes[2].plot(output_metrics_tensor[:,5*(var_num)],color=batch_colors[k])
                 axes[2].set_title(list(out.keys())[5*(var_num)])
                 axes[3].plot(output_metrics_tensor[:,2+ (5*var_num)],color=batch_colors[k])
@@ -488,19 +456,42 @@ class Diffusion(pl.LightningModule):
                 axes[5].set_title(list(out.keys())[4+(5*var_num)])
                 fig.tight_layout()
 
-                # axes[6].plot(output_metrics_tensor[:,5])
-                # axes[6].set_title(list(out.keys())[5])
-            #set title and save file
-            # fig.suptitle(f'{var_names[var_num]}', fontsize=16)
-            file_name = f'{out_dir}/normalized_comparison_{var_names[var_num][0]}.png'
-            from pathlib import Path
+
+            #plot elnino34 indices 
+
+            if(var_num == 9): #aka its top of surface sea temp
+                tos_fig,tos_axes = plt.subplot(2,(16,16))
+                tos_axes = tos_axes.flatten()
+                batch_el_nino_34 = el_nino_34_index(denormed_data[0])  
+    
+                tos_axes[0].plot(batch_el_nino_34,color='black')
+                tos_axes[0].axhline(0, color='black', lw=0.5)
+                tos_axes[0].axhline(0.4, color='black', linewidth=0.5, linestyle='dotted')
+                tos_axes[0].axhline(-0.4, color='black', linewidth=0.5, linestyle='dotted')
+                tos_axes[0].set_title('IPSL Niño 3.4 Index');
+    
+                predicted_el_nino_34 = el_nino_34_index(denormed_data[1])            
+    
+                tos_axes[1].plot(predicted_el_nino_34,color='black')
+                tos_axes[1].axhline(0, color='black', lw=0.5)
+                tos_axes[1].axhline(0.4, color='black', linewidth=0.5, linestyle='dotted')
+                tos_axes[1].axhline(-0.4, color='black', linewidth=0.5, linestyle='dotted')
+                tos_axes[1].set_title('Rollout Niño 3.4 Index');
+                tos_fig.savefig(f'{out_dir}/el_nino_index.png')
+            
+            file_name = f'{out_dir}/statisctics_for_{var_names[var_num][0]}.png'
             output_file = Path(file_name)
             output_file.parent.mkdir(exist_ok=True, parents=True)
-            # if(var_num < 10):
-            #     plt.title(self.dataset.surface_variables[var_num])
             fig.savefig(file_name)
         
-
+            make_gif(
+                    data=denormed_data[:,0,0,:,var_num],
+                    rollout_length=self.num_rollout_steps,
+                    var_name=var_names[var_num],
+                    file_name=f'{out_dir}/denormalized_diffusion_comparison_{var_names[var_num][0]}_ffmpeg',
+                    save=True,
+                denormalized=True
+            )
     
         
     def loss(self, pred, batch, lat_coeffs=None):

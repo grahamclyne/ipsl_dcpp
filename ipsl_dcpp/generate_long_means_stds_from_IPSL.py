@@ -46,25 +46,29 @@ out_mapping = {}
 time = '1961-01'
 means = []
 stds = []
+outputs = []
 for _ in range(0, 590):
     print(time)
     vals = []
     indices = [(x[0],x[1]) for x in list(filter(lambda x: time in str(x[2]), ts))]
     time=inc_time(time)
     for index in indices:
-        vals.append(train.__getitem__(search_by_value(train.id2pt,index))['state_surface'][0])
+        vals.append(train.__getitem__(search_by_value(train.id2pt,index))['state_surface'])
     
     output = torch.stack(vals)
-    mean = output.mean()
-    std = output.std()
-    means.append(mean)
-    stds.append(std)
+    # mean = output.mean()
+    # std = output.std()
+    # means.append(mean)
+    # stds.append(std)
+    outputs.append(output)
    # out_mapping[str(ts[time_index*(num_ensembles+1)][2])[:7]] =  torch.stack(vals)
     print(mean,std)
    # print(str(ts[time_index*(num_ensembles+1)][2])[:7])
-mean_file = open('long_means.pt','wb')
-mean_std = open('long_stds.pt','wb')
+# mean_file = open('unnormed_long_means.pt','wb')
+# mean_std = open('long_stds.pt','wb')
+outputs_file = open('batch_long.pt','wb')
 
 # source, destination
-torch.save(torch.stack(means), mean_file) 
-torch.save(torch.stack(stds), mean_std) 
+# torch.save(torch.stack(means), mean_file) 
+# torch.save(torch.stack(stds), mean_std) 
+torch.save(torch.stack(outputs), outputs_file) 

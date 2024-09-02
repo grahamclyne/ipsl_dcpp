@@ -4,7 +4,7 @@ import hydra
 import torch
 import glob
 import os 
-from visualization_utils import make_gif
+from ipsl_dcpp.utils.visualization_utils import make_gif
 
 # ds = xr.open_dataset('/lustre/fsn1/projects/rech/mlr/udy16au/batch_with_tos/1984_2_tos_included.nc')
 # shell = ds.isel(time=4)['tas']

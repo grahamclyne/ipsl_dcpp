@@ -75,15 +75,15 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         
         if(self.normalization == 'climatology'):
             #self.surface_means = np.load(f'{self.work}/data/climatology_surface_means.npy')
-            self.surface_means = np.load(f'{self.data_path}/reference_data/climatology_surface_means_ensemble_split.npy')
+            self.surface_means = torch.from_numpy(np.load(f'{self.data_path}/reference_data/climatology_surface_means_ensemble_split.npy'))
 
-            self.surface_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/climatology_surface_stds_ensemble_split.npy'),(-2,-1)),(12,len(surface_variables),143,144))
+            self.surface_stds = torch.from_numpy(np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/climatology_surface_stds_ensemble_split.npy'),(-2,-1)),(12,len(surface_variables),143,144)))
             #self.depth_means = np.load(f'{self.work}/data/climatology_depth_means.npy')
            # self.depth_stds = np.load(f'{self.work}/data/climatology_depth_stds.npy')[:,0]
             #self.depth_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_depth_stds.npy'),(-2,-1)),(12,3,11,143,144))
-            self.plev_means = np.load(f'{self.data_path}/reference_data/climatology_plev_means_ensemble_split.npy')
+            self.plev_means = torch.from_numpy(np.load(f'{self.data_path}/reference_data/climatology_plev_means_ensemble_split.npy'))
            # self.depth_stds = np.load(f'{self.work}/data/climatology_depth_stds.npy')[:,0]
-            self.plev_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/climatology_plev_stds_ensemble_split.npy'),(-2,-1)),(12,8,3,143,144))
+            self.plev_stds = torch.from_numpy(np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/climatology_plev_stds_ensemble_split.npy'),(-2,-1)),(12,8,3,143,144)))
             if(self.z_normalize):
                 self.z_means = np.expand_dims(np.nanmean(np.load(f'{self.data_path}/reference_data/after_climatology_surface_means_ensemble_split.npy'),axis=0),(-2,-1))
                 self.z_stds = np.expand_dims(np.nanmean(np.load(f'{self.data_path}/reference_data/after_climatology_surface_stds_ensemble_split.npy'),axis=0),(-2,-1))
@@ -299,30 +299,38 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                     solar_forcings=cur_solar_forcings))
         return out
 
+    def denorm_surface_variables(self,data,month_index):
+        return data[:,:10]*self.surface_stds[month_index] + self.surface_means[month_index]
+
+    def denorm_plev_variables(self,data,month_index):
+        #data here should be [var_num,lat,lon]
+        return data[:,10:]*self.plev_stds[month_index].reshape(-1,8*3,143,144) + self.plev_means[month_index].reshape(-1,8*3,143,144)
+
     
     def denormalize(self, batch):
         device = batch['next_state_surface'].device
         cur_month = int(batch['time'][0].split('-')[-1]) - 1     
         next_month = int(batch['next_time'][0].split('-')[-1]) - 1    
         if(self.delta):
-           # new_state_surface = ((batch['next_state_surface']*self.surface_delta_stds.to(device).unsqueeze(0)) + batch['state_surface'])
             new_state_surface=batch['next_state_surface'][:,:10].to(device)*self.surface_delta_stds.to(device).unsqueeze(0) + batch['state_surface'][:,:10].to(device)
             if(self.flattened_plev):
                 new_state_plev=batch['next_state_surface'][:,10:].to(device)*self.plev_delta_stds.to(device).unsqueeze(0).reshape(1,8*3,1,1) + batch['state_surface'][:,10:].to(device)
                 new_state_surface = torch.concatenate([new_state_surface,new_state_plev],axis=1)
         else:
             new_state_surface=batch['next_state_surface']
-        if(self.normalization == 'climatology'):
-            denorm_surface = lambda x,month_index: x[:,:10]*torch.from_numpy(self.surface_stds[month_index]).to(device) + torch.from_numpy(self.surface_means[month_index]).to(device)
-            denorm_plev = lambda x,month_index: x[:,10:]*torch.from_numpy(self.plev_stds[month_index]).to(device).reshape(-1,8*3,143,144) + torch.from_numpy(self.plev_means[month_index]).to(device).reshape(-1,8*3,143,144)
-           # denorm_surface = lambda x,month_index: x.to(device)*torch.from_numpy(self.surface_stds[month_index]).to(device) + torch.from_numpy(self.surface_means[month_index]).to(device)
-        elif(self.normalization == 'normal' or self.normalization == 'spatial_normal'):
-            denorm_surface = lambda x,month_index: x.squeeze().to(device)*torch.from_numpy(self.surface_stds).to(device) + torch.from_numpy(self.surface_means).to(device)
+            
         batch = dict(
-                    next_state_surface=torch.concatenate([denorm_surface(new_state_surface,next_month),denorm_plev(new_state_surface,next_month)],dim=1),
-                    state_surface=torch.concatenate([denorm_surface(batch['state_surface'],cur_month),denorm_plev(batch['state_surface'],cur_month)],dim=1),
-                   # time=batch['time']
-        )
+                    next_state_surface=torch.concatenate([
+                        denorm_surface_variables(new_state_surface,next_month),
+                        denorm_plev_variables(new_state_surface,next_month)],
+                                                         dim=1
+                    ),
+                    state_surface=torch.concatenate([
+                        denorm_surface_variables(batch['state_surface'],cur_month),
+                        denorm_plev_variables(batch['state_surface'],cur_month)],
+                                                    dim=1
+                    ),
+                )
         return batch
 
     

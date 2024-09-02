@@ -4,15 +4,72 @@ import os
 from matplotlib import animation
 import torch
 from matplotlib.colors import TwoSlopeNorm
+import numpy as np
 
-#this doesnt work in jupyterhub notebook ? 
+#EL NINO RANGE PROOF
+
+def el_nino_proof_of_range():
+    #needed to get proper indices for elnino 3.4 range
+    
+    scratch = os.environ['SCRATCH']
+    ds = xr.open_dataset(f'{scratch}/batch_with_tos/1960_1_tos_included.nc')
+    
+    tos_data = ds['tos'].isel(time=0)
+    el_nino_34 = tos_data.where(
+        (tos_data.lat < 5) & (tos_data.lat > -5) & (tos_data.lon > 190) & (tos_data.lon < 240), drop=True
+    )
+    lats = [round(float(x),5) for x in list(tos_data.lat.data)]
+    lons = [round(float(x),5) for x in list(tos_data.lon.data)]
+    
+    lats.index(-3.80282),lats.index(3.80282),lons.index(192.5),lons.index(237.5) #region of nino 3.4
+
+
+def el_nino_34_index(data):
+    #see https://foundations.projectpythia.org/core/xarray/enso-xarray.html
+    #and https://psl.noaa.gov/enso/dashboard.html
+
+     #[num_batch_examples (diff IC), num_members, rollout_length,var,lat,lon]
+
+    #for now, take first IC and first member
+    tos_el_nino_data = data[0,0,:,9,68:74,77:95]
+    tos_el_nino_data.std()
+    gb = tos_el_nino_data
+    tos_nino34_anom = gb - gb.mean()
+    index_nino34 = tos_nino34_anom.mean(axis=(-1,-2))
+    tos_el_nino_data.reshape(data.shape[2],-1).mean(axis=1)
+    def moving_average(x, w):
+        return np.convolve(x, np.ones(w), 'valid') / w
+    el_nino_index_34 = moving_average(index_nino34.reshape(data.shape[2],-1).mean(axis=1),5)
+    normalized_index_nino34_rolling_mean = el_nino_index_34 / tos_el_nino_data.std()
+    
+    # plt.fill_between(
+    #     [x for x in range(96)],
+    #     normalized_index_nino34_rolling_mean >= 0.4,
+    #     0.4,
+    #     color='red',
+    #     alpha=0.9,
+    # )
+    # plt.fill_between(
+    #     normalized_index_nino34_rolling_mean,
+    #     normalized_index_nino34_rolling_mean.where(
+    #         normalized_index_nino34_rolling_mean <= -0.4
+    #     ).data,
+    #     -0.4,
+    #     color='blue',
+    #     alpha=0.9,
+    # )
+
+    return normalized_index_nino34_rolling_mean
+
+
+#this doesnt work in jupyterhub notebook ? need to figure out how to run "module load ffmpeg"
 def make_gif(
     data, #needs to be shape [batch and/or preds,time_steps,lat,lon]
     rollout_length,
     var_name,
-    var_num,
     file_name,
-    save=False):
+    save=False,
+    denormalized=False):
 
     #get dummy frame 
     scratch = os.environ['SCRATCH']
@@ -21,17 +78,19 @@ def make_gif(
     fig, axes = plt.subplots(1,2, figsize=(16, 6))
     axes = axes.flatten()
     container = []
-    vmin = torch.min(data)
-    vmax = torch.max(data)
+    vmin = np.nanmin(data)
+    vmax = np.nanmax(data)
     print(vmin,vmax)
     # axes[0].set_aspect('equal')
     # axes[1].set_aspect('equal')
 
     for time_step in range(rollout_length):
         shell.data = data[0][time_step]
-
-        norm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
-        line = shell.plot.pcolormesh(ax=axes[0],add_colorbar=False,vmin=torch.min(data),vmax=torch.max(data),norm=norm, cmap="RdBu_r")
+        if(denormalized):
+            norm = TwoSlopeNorm(vmin=vmin,vcenter = (vmin+vmax)/2,vmax=vmax)
+        else:
+            norm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+        line = shell.plot.pcolormesh(ax=axes[0],add_colorbar=False,norm=norm, cmap="RdBu_r")
         # title = axes[0].text(0.5,
         #                       1.05,
         #                       "Month {}".format(time_step), 
@@ -45,7 +104,7 @@ def make_gif(
         
         if(len(data) > 1):
             shell.data = data[1][time_step]
-            line1 = shell.plot.pcolormesh(ax=axes[1],add_colorbar=False,vmin=torch.min(data),vmax=torch.max(data),norm=norm, cmap="RdBu_r")
+            line1 = shell.plot.pcolormesh(ax=axes[1],add_colorbar=False,norm=norm, cmap="RdBu_r")
             axes[1].set_title('')
 
             container.append([line,line1,title])
@@ -98,3 +157,5 @@ def make_gif(
         ani.save(f'{file_name}.gif',writer=writer)
     else:
         return ani
+
+
