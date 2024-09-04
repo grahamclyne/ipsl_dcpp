@@ -76,7 +76,8 @@ class Diffusion(pl.LightningModule):
         num_rollout_steps,
         num_batch_examples,
         scheduler,
-        elevation
+        elevation,
+        month_embed
     ):
         super().__init__()
         self.__dict__.update(locals())
@@ -92,6 +93,7 @@ class Diffusion(pl.LightningModule):
         self.num_rollout_steps = num_rollout_steps
         self.num_batch_examples = num_batch_examples
         self.elevation = elevation
+        self.month_embed = month_embed
         if scheduler == 'ddpm':
             self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_diffusion_timesteps,
                                                            beta_schedule='squaredcos_cap_v2',
@@ -141,17 +143,21 @@ class Diffusion(pl.LightningModule):
             batch['state_level'] = torch.cat([batch['state_level']*sel,batch['prev_state_level']*sel, 
                                    batch['level_noisy']], dim=1)
         # print('batch_time',batch['time'])
-        month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
+
+
         year = torch.tensor([int(x[0:4]) for x in batch['time']]).to(device)
-        month_emb = self.month_embedder(month)
         year_emb = self.month_embedder(year)
         timestep_emb = self.timestep_embedder(timesteps)
         ch4_emb = self.timestep_embedder(batch['forcings'][:,0])
         cfc11_emb = self.timestep_embedder(batch['forcings'][:,1])
         cfc12_emb = self.timestep_embedder(batch['forcings'][:,2])
         c02_emb = self.timestep_embedder(batch['forcings'][:,3])
-
-        cond_emb = (month_emb + year_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb)
+        if(self.month_embed):
+            month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
+            month_emb = self.month_embedder(month)
+            cond_emb = (month_emb + year_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb)
+        else:
+            cond_emb = (year_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb)
         for wavelength_index in range(len(batch['solar_forcings'][0])):
             cond_emb += self.timestep_embedder(batch['solar_forcings'][:,wavelength_index]) 
         out = self.backbone(batch, cond_emb)
