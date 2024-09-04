@@ -373,7 +373,7 @@ class Diffusion(pl.LightningModule):
             for ic_index in range(num_batch_examples):
                 for member_index in range(self.num_members): 
                     means = torch.mean(data[1,ic_index,member_index,:,var_num],axis=(-1,-2)) 
-                    axes[0].plot(means,color=batch_colors[member_index//self.num_members])
+                    axes[0].plot(means,color=batch_colors[ic_index])
                 axes[1].plot(torch.mean(data[0,ic_index,0,:,var_num],axis=(-1,-2)),color=batch_colors[ic_index])
             axes[0].set_ylim(minimum,maximum)
             axes[1].set_ylim(minimum,maximum)
@@ -399,7 +399,7 @@ class Diffusion(pl.LightningModule):
             for ic_index in range(num_batch_examples):
                 month_index = 0
                 batch_denormalized = []
-                denormalized_surface = []
+                denormed_surface_members = []
                 for rollout_index in range(self.num_rollout_steps):
                     #denormalize batch
                     batch_denormed_surface = self.dataset.denorm_surface_variables(
@@ -407,7 +407,7 @@ class Diffusion(pl.LightningModule):
                     batch_denormed_plev = self.dataset.denorm_plev_variables(
                         data[None,1,ic_index,0,rollout_index],month_index)
                     batch_denormalized.append(torch.concatenate([batch_denormed_surface,batch_denormed_plev],axis=1))
-                    
+                    denormalized_surface = []
                     for member_index in range(self.num_members):
                         
                         denormed_plev = self.dataset.denorm_plev_variables(
@@ -421,15 +421,21 @@ class Diffusion(pl.LightningModule):
                         month_index = 0
                     else:
                         month_index += 1
-                denormed_surface_ensembles.append(torch.stack(denormalized_surface))
+                    denormed_surface_members.append(torch.stack(denormalized_surface))
+                denormed_surface_ensembles.append(torch.stack(denormed_surface_members))
                 denormed_batch_surface_ensembles.append(torch.stack(batch_denormalized))
-            denormed_surface_ensembles = torch.stack(denormed_surface_ensembles).reshape(num_batch_examples,self.num_members,self.num_rollout_steps,34,143,144)
-            denormed_batch_surface_ensembles = torch.stack(denormed_batch_surface_ensembles).reshape(num_batch_examples,1,self.num_rollout_steps,34,143,144).expand(-1,self.num_ensemble_members,-1,-1,-1,-1)
-
-
+            print('pred_denorm',torch.stack(denormed_surface_ensembles).shape)
+            print(torch.stack(denormed_batch_surface_ensembles).shape)
+            
+            denormed_surface_ensembles = torch.stack(denormed_surface_ensembles).squeeze(3)
+            denormed_surface_ensembles = torch.swapdims(denormed_surface_ensembles,1,2)
+            denormed_batch_surface_ensembles = torch.stack(denormed_batch_surface_ensembles)
+            denormed_batch_surface_ensembles = torch.swapdims(denormed_batch_surface_ensembles,1,2)
+            denormed_batch_surface_ensembles = denormed_batch_surface_ensembles.expand(-1,self.num_ensemble_members,-1,-1,-1,-1)
+            
             #should be same shape as normed data: [[batch,pred],num_batch_examples (diff IC), num_members, rollout_length,var,lat,lon]
             denormed_data = torch.stack([denormed_batch_surface_ensembles,denormed_surface_ensembles])
-            
+            print(denormed_data.shape)
             #calculate and plot sss and crps for timeseries
             for ic_index in range(num_batch_examples):
                 self.metrics = EnsembleMetrics(dataset=self.dataset).cpu()
@@ -446,13 +452,13 @@ class Diffusion(pl.LightningModule):
                         output_metrics.append(torch.tensor(list(out.values())))
                         
                 output_metrics_tensor = torch.stack(output_metrics)
-                axes[2].plot(output_metrics_tensor[:,5*(var_num)],color=batch_colors[k])
+                axes[2].plot(output_metrics_tensor[:,5*(var_num)],color=batch_colors[ic_index])
                 axes[2].set_title(list(out.keys())[5*(var_num)])
-                axes[3].plot(output_metrics_tensor[:,2+ (5*var_num)],color=batch_colors[k])
+                axes[3].plot(output_metrics_tensor[:,2+ (5*var_num)],color=batch_colors[ic_index])
                 axes[3].set_title(list(out.keys())[2+(5*var_num)])
-                axes[4].plot(output_metrics_tensor[:,3+(5*var_num)],color=batch_colors[k])
+                axes[4].plot(output_metrics_tensor[:,3+(5*var_num)],color=batch_colors[ic_index])
                 axes[4].set_title(list(out.keys())[3+(5*var_num)])
-                axes[5].plot(output_metrics_tensor[:,4+(5*var_num)],color=batch_colors[k])
+                axes[5].plot(output_metrics_tensor[:,4+(5*var_num)],color=batch_colors[ic_index])
                 axes[5].set_title(list(out.keys())[4+(5*var_num)])
                 fig.tight_layout()
 
@@ -479,7 +485,7 @@ class Diffusion(pl.LightningModule):
                 tos_axes[1].set_title('Rollout Niño 3.4 Index');
                 tos_fig.savefig(f'{out_dir}/el_nino_index.png')
             
-            file_name = f'{out_dir}/statisctics_for_{var_names[var_num][0]}.png'
+            file_name = f'{out_dir}/statistics_for_{var_names[var_num][0]}.png'
             output_file = Path(file_name)
             output_file.parent.mkdir(exist_ok=True, parents=True)
             fig.savefig(file_name)

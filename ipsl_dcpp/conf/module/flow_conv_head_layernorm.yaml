@@ -1,4 +1,4 @@
-name: flow_conv_head_layernorm_no_chopped
+name: flow_conv_head_layernorm
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
@@ -19,13 +19,13 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 75
+  num_inference_steps: 25
   prediction_type: 'v_prediction'
   num_ensemble_members: 3
   num_batch_examples: 2
   p_uncond: 0.0
   scheduler: 'flow'
-  num_rollout_steps: 30
+  num_rollout_steps: 10
   elevation: True
 
 backbone:

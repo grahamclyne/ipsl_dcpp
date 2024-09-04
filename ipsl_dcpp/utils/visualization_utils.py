@@ -81,6 +81,7 @@ def make_gif(
     vmin = np.nanmin(data)
     vmax = np.nanmax(data)
     print(vmin,vmax)
+    print(data.shape)
     # axes[0].set_aspect('equal')
     # axes[1].set_aspect('equal')
 
@@ -144,7 +145,7 @@ def make_gif(
     #     container.append([line,line1,title])
     # if(var_num < 10):
     #     plt.title(self.dataset.surface_variables[var_num])
-    writer = animation.FFMpegWriter(fps=2)
+    writer = animation.FFMpegWriter(fps=1)
     ani = animation.ArtistAnimation(fig, container)
     # ani.save(f'{out_dir}/diffusion_comparison_{var_names[var_num][0]}_ffmpeg.gif',writer=writer)
 

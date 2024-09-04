@@ -1,4 +1,4 @@
-name: flow_conv_head_layernorm
+name: flow_conv_head_layernorm_no_chopped
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
@@ -52,5 +52,5 @@ backbone:
   #level_ch: 8
   depth_ch: 0
   use_skip: False
-  cropped: True
+  cropped: False
   smoothing: False
