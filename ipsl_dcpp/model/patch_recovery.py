@@ -160,7 +160,10 @@ class PatchRecovery3(nn.Module):
        #     nn.Conv2d(4*dim, 4*dim, kernel_size=3, stride=1, padding=1),
        #     GeLU())
         self.cropped = cropped
-        self.norm = nn.LayerNorm((output_dim,144,144))
+        if(not self.cropped):
+            self.norm = nn.LayerNorm((output_dim,143,144))
+        else:
+            self.norm = nn.LayerNorm((output_dim,144,144))
 
         if(self.cropped):
             self.proj = nn.Conv2d(4*dim, output_dim, kernel_size=1, stride=1, padding=0)

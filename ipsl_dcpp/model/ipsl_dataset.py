@@ -299,12 +299,12 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                     solar_forcings=cur_solar_forcings))
         return out
 
-    def denorm_surface_variables(self,data,month_index):
-        return data[:,:10]*self.surface_stds[month_index] + self.surface_means[month_index]
+    def denorm_surface_variables(self,data,month_index,device):
+        return data[:,:10]*self.surface_stds[month_index].to(device) + self.surface_means[month_index].to(device)
 
-    def denorm_plev_variables(self,data,month_index):
+    def denorm_plev_variables(self,data,month_index,device):
         #data here should be [var_num,lat,lon]
-        return data[:,10:]*self.plev_stds[month_index].reshape(-1,8*3,143,144) + self.plev_means[month_index].reshape(-1,8*3,143,144)
+        return data[:,10:]*self.plev_stds[month_index].reshape(-1,8*3,143,144).to(device) + self.plev_means[month_index].reshape(-1,8*3,143,144).to(device)
 
     
     def denormalize(self, batch):
@@ -321,13 +321,13 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             
         batch = dict(
                     next_state_surface=torch.concatenate([
-                        denorm_surface_variables(new_state_surface,next_month),
-                        denorm_plev_variables(new_state_surface,next_month)],
+                        self.denorm_surface_variables(new_state_surface,next_month,device),
+                        self.denorm_plev_variables(new_state_surface,next_month,device)],
                                                          dim=1
                     ),
                     state_surface=torch.concatenate([
-                        denorm_surface_variables(batch['state_surface'],cur_month),
-                        denorm_plev_variables(batch['state_surface'],cur_month)],
+                        self.denorm_surface_variables(batch['state_surface'],cur_month,device),
+                        self.denorm_plev_variables(batch['state_surface'],cur_month,device)],
                                                     dim=1
                     ),
                 )

@@ -25,7 +25,7 @@ module:
   num_batch_examples: 2
   p_uncond: 0.0
   scheduler: 'flow'
-  num_rollout_steps: 10
+  num_rollout_steps: 50
   elevation: True
 
 backbone:
