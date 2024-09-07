@@ -27,7 +27,7 @@ module:
   scheduler: 'flow'
   num_rollout_steps: 30
   elevation: True
-  month_embed: False
+  month_embed: True
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather

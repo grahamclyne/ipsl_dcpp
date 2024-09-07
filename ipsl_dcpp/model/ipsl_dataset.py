@@ -75,15 +75,15 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         
         if(self.normalization == 'climatology'):
             #self.surface_means = np.load(f'{self.work}/data/climatology_surface_means.npy')
-            self.surface_means = torch.from_numpy(np.load(f'{self.data_path}/reference_data/climatology_surface_means_ensemble_split.npy'))
+            self.surface_means = torch.tensor(np.load(f'{self.data_path}/reference_data/climatology_surface_means_ensemble_split.npy'))
 
-            self.surface_stds = torch.from_numpy(np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/climatology_surface_stds_ensemble_split.npy'),(-2,-1)),(12,len(surface_variables),143,144)))
+            self.surface_stds = torch.tensor(np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/climatology_surface_stds_ensemble_split.npy'),(-2,-1)),(12,len(surface_variables),143,144)))
             #self.depth_means = np.load(f'{self.work}/data/climatology_depth_means.npy')
            # self.depth_stds = np.load(f'{self.work}/data/climatology_depth_stds.npy')[:,0]
             #self.depth_stds = np.broadcast_to(np.expand_dims(np.load(f'{self.work}/data/climatology_depth_stds.npy'),(-2,-1)),(12,3,11,143,144))
-            self.plev_means = torch.from_numpy(np.load(f'{self.data_path}/reference_data/climatology_plev_means_ensemble_split.npy'))
+            self.plev_means = torch.tensor(np.load(f'{self.data_path}/reference_data/climatology_plev_means_ensemble_split.npy'))
            # self.depth_stds = np.load(f'{self.work}/data/climatology_depth_stds.npy')[:,0]
-            self.plev_stds = torch.from_numpy(np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/climatology_plev_stds_ensemble_split.npy'),(-2,-1)),(12,8,3,143,144)))
+            self.plev_stds = torch.tensor(np.broadcast_to(np.expand_dims(np.load(f'{self.data_path}/reference_data/climatology_plev_stds_ensemble_split.npy'),(-2,-1)),(12,8,3,143,144)))
             if(self.z_normalize):
                 self.z_means = np.expand_dims(np.nanmean(np.load(f'{self.data_path}/reference_data/after_climatology_surface_means_ensemble_split.npy'),axis=0),(-2,-1))
                 self.z_stds = np.expand_dims(np.nanmean(np.load(f'{self.data_path}/reference_data/after_climatology_surface_stds_ensemble_split.npy'),axis=0),(-2,-1))
@@ -300,6 +300,8 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         return out
 
     def denorm_surface_variables(self,data,month_index,device):
+        # print(device)
+        # print(self.surface_stds.device)
         return data[:,:10]*self.surface_stds[month_index].to(device) + self.surface_means[month_index].to(device)
 
     def denorm_plev_variables(self,data,month_index,device):

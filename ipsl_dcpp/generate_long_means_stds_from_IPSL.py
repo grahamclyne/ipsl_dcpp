@@ -47,7 +47,7 @@ time = '1961-01'
 means = []
 stds = []
 outputs = []
-for _ in range(0, 20):
+for _ in range(0, 590):
     print(time)
     vals = []
     indices = [(x[0],x[1]) for x in list(filter(lambda x: time in str(x[2]), ts))]
@@ -56,16 +56,19 @@ for _ in range(0, 20):
         batch = train.__getitem__(search_by_value(train.id2pt,index))
         batch = {k:[batch[k]] if k == 'time' or k == 'next_time' else batch[k].unsqueeze(0) for k in batch.keys()}  #simulate lightnings batching dimension
         denormed = train.denormalize(batch)
-        mean = denormed['state_surface'][0].mean()
-        std = denormed['state_surface'][0].std()
+        vals.append(denormed['state_surface'][0,0]) #only get tas
+    output = torch.stack(vals)
+    # print(output.shape)
+    mean = output.nanmean(axis=(-1,-2))
+    # std = denormed['state_surface'][0].nanstd()
+
         # print(batch.shape)
-        # vals.append(batch) #only get tas
     
     # output = torch.stack(vals)
     # mean = output.mean()
     # std = output.std()
-        means.append(mean)
-        stds.append(std)
+    means.append(mean.mean())
+    stds.append(mean.std())
     # outputs.append(output)
    # out_mapping[str(ts[time_index*(num_ensembles+1)][2])[:7]] =  torch.stack(vals)
    # print(mean,std)

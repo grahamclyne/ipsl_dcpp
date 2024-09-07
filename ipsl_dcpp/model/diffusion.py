@@ -409,18 +409,18 @@ class Diffusion(pl.LightningModule):
                 for rollout_index in range(self.num_rollout_steps):
                     #denormalize batch
                     batch_denormed_surface = self.dataset.denorm_surface_variables(
-                        data[None,1,ic_index,0,rollout_index],month_index)
+                        data[None,1,ic_index,0,rollout_index],month_index,'cpu')
                     batch_denormed_plev = self.dataset.denorm_plev_variables(
-                        data[None,1,ic_index,0,rollout_index],month_index)
+                        data[None,1,ic_index,0,rollout_index],month_index,'cpu')
                     batch_denormalized.append(torch.concatenate([batch_denormed_surface,batch_denormed_plev],axis=1))
                     denormalized_surface = []
                     for member_index in range(self.num_members):
                         
                         denormed_plev = self.dataset.denorm_plev_variables(
-                            data[None,0,ic_index,member_index,rollout_index],month_index
+                            data[None,0,ic_index,member_index,rollout_index],month_index,'cpu'
                         ) 
                         denormed_surface = self.dataset.denorm_surface_variables(
-                            data[None,0,ic_index,member_index,rollout_index],month_index
+                            data[None,0,ic_index,member_index,rollout_index],month_index,'cpu'
                         )
                         denormalized_surface.append(torch.concatenate([denormed_surface,denormed_plev],axis=1))
                     if(month_index == 11):
@@ -472,7 +472,7 @@ class Diffusion(pl.LightningModule):
             #plot elnino34 indices 
 
             if(var_num == 9): #aka its top of surface sea temp
-                tos_fig,tos_axes = plt.subplot(2,(16,16))
+                tos_fig,tos_axes = plt.subplots(2,figsize=(16,16))
                 tos_axes = tos_axes.flatten()
                 batch_el_nino_34 = el_nino_34_index(denormed_data[0])  
     

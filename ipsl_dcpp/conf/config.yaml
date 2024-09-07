@@ -1,7 +1,7 @@
 defaults:
   - cluster: jean_zay_v100
   - dataloader: ipsl
-  - module: flow_no_month
+  - module: flow_elevation_timesteps_new_transpose_conv
   - override hydra/launcher: submitit_slurm
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none

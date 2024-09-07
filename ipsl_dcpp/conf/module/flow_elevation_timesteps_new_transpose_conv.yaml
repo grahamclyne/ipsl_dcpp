@@ -1,4 +1,4 @@
-name: flow_sub_pixel_elevation_scaled_250_timesteps
+name: flow_elevation_scaled_250_timesteps
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
@@ -12,7 +12,7 @@ mask_value: 0
 
 module:
   _target_: ipsl_dcpp.model.diffusion.Diffusion
-  num_diffusion_timesteps: 250
+  num_diffusion_timesteps: 1000
   lr: 3e-4
   weight_decay: 0.01
   betas: [0.9, 0.99]
@@ -25,7 +25,7 @@ module:
   num_batch_examples: 3
   p_uncond: 0.0
   scheduler: 'flow'
-  num_rollout_steps: 5
+  num_rollout_steps: 10
   elevation: True
   month_embed: True
 
@@ -34,7 +34,7 @@ backbone:
   soil: False
   plev: False
   conv_head: False
-  sub_pixel: True
+  sub_pixel: False
   lon_resolution: 144
   lat_resolution: 143
   emb_dim: 576
