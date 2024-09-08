@@ -72,13 +72,16 @@ class PatchRecovery2D(nn.Module):
     def __init__(self, img_size, patch_size, in_chans, out_chans):
         super().__init__()
         self.img_size = img_size
-        self.conv = nn.ConvTranspose2d(in_chans, out_chans, (1,2), patch_size)
+        #self.conv = nn.ConvTranspose2d(in_chans, out_chans, patch_size, patch_size)
+        self.conv = nn.ConvTranspose2d(in_chans,out_chans,2,2,padding=(1,0),output_padding=(1,0))
+        # self.conv1 = nn.Conv2d(out_chans,out_chans,(2,1),1) #for making it 143,144
         # print(img_size, patch_size, in_chans, out_chans)
 
     def forward(self, x):
         print(x.shape)
 
         output = self.conv(x)
+      #  output = self.conv1(output)
        # print('output',output.shape)
         _, _, H, W = output.shape
         h_pad = H - self.img_size[0]
