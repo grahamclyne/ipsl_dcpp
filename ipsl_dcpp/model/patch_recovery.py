@@ -73,7 +73,7 @@ class PatchRecovery2D(nn.Module):
         super().__init__()
         self.img_size = img_size
         self.conv = nn.ConvTranspose2d(in_chans, out_chans, patch_size, patch_size)
-        self.conv = nn.ConvTranspose2d(in_chans,out_chans,2,2,padding=(1,0),output_padding=(1,0))
+     #   self.conv = nn.ConvTranspose2d(in_chans,out_chans,2,2,padding=(1,0),output_padding=(1,0))
        
     
     # self.conv1 = nn.Conv2d(out_chans,out_chans,(2,1),1) #for making it 143,144
@@ -95,7 +95,7 @@ class PatchRecovery2D(nn.Module):
        # print(output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right].shape)
         # return output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right]
         return output[:,:,1:,:] #aka bottom_crop
-        #return output[:,:,:,:]
+      #  return output[:,:,:,:]
 
 class PatchRecovery3D(nn.Module):
     """
