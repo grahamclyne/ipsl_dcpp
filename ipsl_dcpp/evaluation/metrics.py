@@ -63,19 +63,19 @@ class EnsembleMetrics(Metric):
         
     def nanvar(self,tensor, dim, keepdim):
         tensor_mean = tensor.nanmean(dim=dim, keepdim=True)
-        # print(tensor_mean)
+       # print(tensor_mean)
         # print('tensor_mean_shape',tensor_mean.shape)
         # print(tensor.shape)
-        # print(tensor)
+       # print(tensor)
         # print((tensor - tensor_mean))
         output = (tensor - tensor_mean).pow(2).nanmean(dim=dim, keepdim=keepdim)
         # print(output)
         return output
         
-    def wmse(self, x, y=1): # weighted mse error
+    def wmse(self, x, y=0): # weighted mse error
         return (x - y).pow(2).mul(self.lat_coeffs).nanmean((-2, -1))
 
-    def wmae(self, x, y=1):
+    def wmae(self, x, y=0):
         return (x - y).abs().mul(self.lat_coeffs).nanmean((-2, -1))
 
     def wvar(self, x, dim=1): # weighted variance along axis
@@ -112,6 +112,9 @@ class EnsembleMetrics(Metric):
         # print(self.wvar(preds['next_state_surface']))
 
         self.var_surface += self.wvar(preds).sum(0)
+
+        print(self.err_surface)
+        # print(self.var_surface)
         # print(preds['next_state_surface'])
         # print(preds['next_state_surface'].shape)
         # print(self.var_surface)

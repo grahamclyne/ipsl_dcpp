@@ -12,20 +12,20 @@ mask_value: 0
 
 module:
   _target_: ipsl_dcpp.model.diffusion.Diffusion
-  num_diffusion_timesteps: 1000
+  num_diffusion_timesteps: 250
   lr: 3e-4
   weight_decay: 0.01
   betas: [0.9, 0.99]
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 25
+  num_inference_steps: 10
   prediction_type: 'v_prediction'
   num_ensemble_members: 2
   num_batch_examples: 3
   p_uncond: 0.0
   scheduler: 'flow'
-  num_rollout_steps: 10
+  num_rollout_steps: 14
   elevation: True
   month_embed: True
 

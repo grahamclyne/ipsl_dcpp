@@ -80,8 +80,8 @@ def make_gif(
     container = []
     vmin = np.nanmin(data)
     vmax = np.nanmax(data)
-    print(vmin,vmax)
-    print(data.shape)
+    # print(vmin,vmax)
+    # print(data.shape)
     # axes[0].set_aspect('equal')
     # axes[1].set_aspect('equal')
 
