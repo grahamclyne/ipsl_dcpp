@@ -192,9 +192,9 @@ def main(cfg: DictConfig):
     # first, check if exp exists
     if Path(cfg.exp_dir).exists():
         print('Experiment already exists. Trying to resume it.')
-        # exp_cfg = OmegaConf.load(Path(cfg.exp_dir) / 'config.yaml')
-        # if cfg.resume:
-        #     cfg = exp_cfg
+        exp_cfg = OmegaConf.load(Path(cfg.exp_dir) / 'config.yaml')
+        if cfg.resume:
+            cfg = exp_cfg
         # else:
         #     # check that new config and old config match
         #     if OmegaConf.to_yaml(cfg.module, resolve=True) != OmegaConf.to_yaml(exp_cfg.module):
@@ -208,13 +208,13 @@ def main(cfg: DictConfig):
         #         print('New config', OmegaConf.to_yaml(cfg.dataloader))
 
             
-        # trying to find checkpoints
-        # ckpt_dir = Path(cfg.exp_dir).joinpath('checkpoints')
-        # if ckpt_dir.exists():
-        #     ckpts = list(sorted(ckpt_dir.iterdir(), key=os.path.getmtime))
-        #     if len(ckpts):
-        #         print('Found checkpoints', ckpts)
-        #         ckpt_path = ckpts[-1]  
+        trying to find checkpoints
+        ckpt_dir = Path(cfg.exp_dir).joinpath('checkpoints')
+        if ckpt_dir.exists():
+            ckpts = list(sorted(ckpt_dir.iterdir(), key=os.path.getmtime))
+            if len(ckpts):
+                print('Found checkpoints', ckpts)
+                ckpt_path = ckpts[-1]  
 
 
     if cfg.log:

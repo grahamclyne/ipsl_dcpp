@@ -369,7 +369,7 @@ class Diffusion(pl.LightningModule):
 
         
         #make plots for each variable in the set
-        for var_num in range(0,1):
+        for var_num in range(0,34):
             fig, axes = plt.subplots(6, figsize=(16, 16))
             axes = axes.flatten()
 
