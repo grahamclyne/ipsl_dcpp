@@ -208,7 +208,7 @@ def main(cfg: DictConfig):
         #         print('New config', OmegaConf.to_yaml(cfg.dataloader))
 
             
-        trying to find checkpoints
+        #trying to find checkpoints
         ckpt_dir = Path(cfg.exp_dir).joinpath('checkpoints')
         if ckpt_dir.exists():
             ckpts = list(sorted(ckpt_dir.iterdir(), key=os.path.getmtime))
