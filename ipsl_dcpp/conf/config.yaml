@@ -1,7 +1,7 @@
 defaults:
   - cluster: jean_zay_v100
   - dataloader: ipsl
-  - module: flow_no_climatology_no_delta
+  - module: flow_no_climatology_delta
   - override hydra/launcher: submitit_slurm
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none
@@ -16,7 +16,7 @@ exp_dir: ${cluster.wandb_dir}${module.project}/${name}/
 
 
 seed: 0
-max_steps: 400000
+max_steps: 200000
 batch_size: ${module.batch_size}
 resume: True
 
@@ -28,5 +28,9 @@ debug: False
 log: ${eval:'not ${debug}'} #wandb logging
 
 #put load_ckpt here
-load_ckpt: /lustre/fsn1/projects/rech/mlr/udy16au/model_output/ipsl_diffusion/${module.name}/checkpoints/checkpoint_global_step=102691.ckpt
+#oad_ckpt: /lustre/fsn1/projects/rech/mlr/udy16au/model_output/ipsl_diffusion/${module.name}/checkpoints/checkpoint_global_step=102691.ckpt
 
+
+# sweeper:
+#     params:
+#       module: flow_no_climatology_no_delta,flow_sub_pixel_no_delta,flow_sub_pixel_elevation,flow_sub_pixel,flow_conv_head_layernorm,ddpm_elevation_scaled_1000_timesteps

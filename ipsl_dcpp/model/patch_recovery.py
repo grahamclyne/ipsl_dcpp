@@ -86,15 +86,16 @@ class PatchRecovery2D(nn.Module):
         _, _, H, W = output.shape
         h_pad = H - self.img_size[0]
         w_pad = W - self.img_size[1]
-      #  print(h_pad,w_pad)
+        #print(h_pad,w_pad)
         padding_top = h_pad // 2
         padding_bottom = int(h_pad - padding_top)
 
         padding_left = w_pad // 2
         padding_right = int(w_pad - padding_left)
-       # print(output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right].shape)
+       # print(padding_top,padding_bottom,padding_left,padding_right)
+        # print(output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right].shape)
         return output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right]
-      #  return output[:,:,1:,:] #aka bottom_crop
+       # return output[:,:,1:,:] #aka bottom_crop
       #  return output[:,:,:,:]
 
 class PatchRecovery3D(nn.Module):

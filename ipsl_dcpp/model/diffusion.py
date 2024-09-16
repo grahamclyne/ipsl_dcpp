@@ -306,25 +306,58 @@ class Diffusion(pl.LightningModule):
             rollout = self.sample_rollout(batch,rollout_length=118*5,seed = ensemble_member)
             torch.save(torch.stack(rollout['state_surface']),f'{out_dir}/long_rollout_{ensemble_member}.pt')
 
-    def predict_step(self,batch,batch_nb):        
 
-        #make variable names for output
-        var_names = self.dataset.surface_variables.copy()
-        plev_var_names = [[x+'_850',x+'_750',x+'_500'] for x in self.dataset.plev_variables]
-        for x in plev_var_names:
-            for name in x:
-                var_names.append(name)
-        var_names = [(var_names[index], 0, index) for index in range(len(var_names))]
+    def unnormalize_data(self,data):
+        #denormalize, this is different from the denorm function in the IPSL_DATASET class as it does not consider dictionary of 'state_surface', should this be a function as well? 
+        device = 'cuda:0'
+        denormed_surface_ensembles = []
+        denormed_batch_surface_ensembles = []
+        for ic_index in range(self.num_batch_examples):
+            month_index = 1
+            batch_denormalized = []
+            denormed_surface_members = []
+            for rollout_index in range(self.num_rollout_steps):
+                #denormalize batch
+                batch_denormed_surface = self.dataset.denorm_surface_variables(
+                    data[None,0,ic_index,0,rollout_index],month_index,device)
+                batch_denormed_plev = self.dataset.denorm_plev_variables(
+                    data[None,0,ic_index,0,rollout_index],month_index,device)
+                batch_denormalized.append(torch.concatenate([batch_denormed_surface,batch_denormed_plev],axis=1))
+                denormalized_surface = []
+                for member_index in range(self.num_members):
+                    
+                    denormed_plev = self.dataset.denorm_plev_variables(
+                        data[None,1,ic_index,member_index,rollout_index],month_index,device
+                    ) 
+                    denormed_surface = self.dataset.denorm_surface_variables(
+                        data[None,1,ic_index,member_index,rollout_index],month_index,device
+                    )
+                    denormalized_surface.append(torch.concatenate([denormed_surface,denormed_plev],axis=1))
+                if(month_index == 11):
+                    month_index = 0
+                else:
+                    month_index += 1
+                denormed_surface_members.append(torch.stack(denormalized_surface))
+            denormed_surface_ensembles.append(torch.stack(denormed_surface_members))
+            denormed_batch_surface_ensembles.append(torch.stack(batch_denormalized))
+        # print('pred_denorm',torch.stack(denormed_surface_ensembles).shape)
+        # print(torch.stack(denormed_batch_surface_ensembles).shape)
         
-        #only do rollout for every beginning of year
-        device = batch['state_surface'].device
-        # print(device)
-        out_dir = f'./plots/{self.dataset.plot_output_path}/'
-        os.makedirs(out_dir,exist_ok=True)
+        denormed_surface_ensembles = torch.stack(denormed_surface_ensembles).squeeze(3)
+        denormed_surface_ensembles = torch.swapdims(denormed_surface_ensembles,1,2)
+        denormed_batch_surface_ensembles = torch.stack(denormed_batch_surface_ensembles)
+        denormed_batch_surface_ensembles = torch.swapdims(denormed_batch_surface_ensembles,1,2)
+        denormed_batch_surface_ensembles = denormed_batch_surface_ensembles.expand(-1,self.num_ensemble_members,-1,-1,-1,-1)
+        
+        #should be same shape as normed data: [[batch,pred],num_batch_examples (diff IC), num_members, rollout_length,var,lat,lon]
+        denormed_data = torch.stack([denormed_batch_surface_ensembles,denormed_surface_ensembles])
+        return denormed_data 
+
+    def make_rollout_and_batch_data(self):
+        #returns tensor of shape [[batch,pred],num_batch_examples (diff IC), num_members, rollout_length,var,lat,lon]
         ipsl_ensemble = []
-        num_batch_examples = self.num_batch_examples
-        batch_colors = ['blue','green','black']
         rollout_ensemble = []
+        device = 'cuda:0'
         seed_id = 0 
         for k in range(0,self.num_batch_examples):
             batch_timeseries = []
@@ -349,25 +382,51 @@ class Diffusion(pl.LightningModule):
             ipsl_ensemble.append(torch.stack(batch_timeseries))
         ipsl_ensemble = torch.stack(ipsl_ensemble)
         rollout_ensemble = torch.stack(rollout_ensemble)
-
-        # print(rollout_ensemble.shape)
-        # print(ipsl_ensemble.shape)
-
         #some rejigging of the shapes 
         rollout_ensemble = rollout_ensemble.squeeze(3)
         ipsl_ensemble = ipsl_ensemble.unsqueeze(1).to(device)
         ipsl_ensemble = ipsl_ensemble.expand(-1,self.num_ensemble_members,-1,-1,-1,-1) # this doubles the "member" dimension to match rollout and make it stackable, is this too big of a waste of space ? 
+        data = torch.stack([ipsl_ensemble,rollout_ensemble])    
+        return data
 
-        data = torch.stack([ipsl_ensemble,rollout_ensemble])
-        
+
+    def sharpness_test(self):
+        #returns sharpness for rollout_length
+        data = self.make_rollout_and_batch_data()
+        denormed_data = self.unnormalize_data(data)
+        device = 'cuda:0'
+        sharpness = []
+        for ic_index in range(self.num_batch_examples):
+            self.metrics = EnsembleMetrics(dataset=self.dataset).to(device)
+            output_metrics = []
+            for rollout_index in range(self.num_rollout_steps):
+                #needs to be [1, num_pred_members_per_sample (should be 1 for batch), variables, lat, lon]
+                self.metrics.update(
+                    denormed_data[None,0,ic_index,:1,rollout_index],
+                    denormed_data[None,1,ic_index,:,rollout_index]
+                )
+                for metric in [self.metrics]:
+                    out = metric.compute()
+                    metric.reset()
+                    output_metrics.append(torch.tensor(list(out.values())))
+            sharpness.append(output_metrics)
+        return sharpness
+    def predict_step(self,batch,batch_nb):        
+        #make variable names for output
+        var_names = self.dataset.surface_variables.copy()
+        plev_var_names = [[x+'_850',x+'_750',x+'_500'] for x in self.dataset.plev_variables]
+        for x in plev_var_names:
+            for name in x:
+                var_names.append(name)
+        var_names = [(var_names[index], 0, index) for index in range(len(var_names))]
+        device = batch['state_surface'].device
+        out_dir = f'./plots/{self.dataset.plot_output_path}/'
+        os.makedirs(out_dir,exist_ok=True)
+        batch_colors = ['blue','green','black']
+        data = make_rollout_and_batch_data()
         #shape is now [[batch,pred],num_batch_examples (diff IC), num_members, rollout_length,var,lat,lon]
         # print(data.shape)
 
-
-
-
-
-        
         #make plots for each variable in the set
         for var_num in range(0,34):
             fig, axes = plt.subplots(6, figsize=(16, 16))
@@ -378,7 +437,7 @@ class Diffusion(pl.LightningModule):
             #make plot of actual output and compare
             minimum = torch.min(torch.mean(data[:,:,:,:,var_num],axis=(-1,-2))).cpu()
             maximum = torch.max(torch.mean(data[:,:,:,:,var_num],axis=(-1,-2))).cpu()
-            for ic_index in range(num_batch_examples):
+            for ic_index in range(self.num_batch_examples):
                 for member_index in range(self.num_members): 
                     means = torch.mean(data[1,ic_index,member_index,:,var_num],axis=(-1,-2)) 
                     axes[0].plot(means.cpu(),color=batch_colors[ic_index])
@@ -400,68 +459,14 @@ class Diffusion(pl.LightningModule):
                     save=True
             )
 
-            
-            #denormalize, this is different from the denorm function in the IPSL_DATASET class as it does not consider dictionary of 'state_surface', should this be a function as well? 
-            denormed_surface_ensembles = []
-            denormed_batch_surface_ensembles = []
-            for ic_index in range(num_batch_examples):
-                month_index = 1
-                batch_denormalized = []
-                denormed_surface_members = []
-                for rollout_index in range(self.num_rollout_steps):
-                    #denormalize batch
-                    batch_denormed_surface = self.dataset.denorm_surface_variables(
-                        data[None,0,ic_index,0,rollout_index],month_index,device)
-                    batch_denormed_plev = self.dataset.denorm_plev_variables(
-                        data[None,0,ic_index,0,rollout_index],month_index,device)
-                    batch_denormalized.append(torch.concatenate([batch_denormed_surface,batch_denormed_plev],axis=1))
-                    denormalized_surface = []
-                    for member_index in range(self.num_members):
-                        
-                        denormed_plev = self.dataset.denorm_plev_variables(
-                            data[None,1,ic_index,member_index,rollout_index],month_index,device
-                        ) 
-                        denormed_surface = self.dataset.denorm_surface_variables(
-                            data[None,1,ic_index,member_index,rollout_index],month_index,device
-                        )
-                        denormalized_surface.append(torch.concatenate([denormed_surface,denormed_plev],axis=1))
-                    if(month_index == 11):
-                        month_index = 0
-                    else:
-                        month_index += 1
-                    denormed_surface_members.append(torch.stack(denormalized_surface))
-                denormed_surface_ensembles.append(torch.stack(denormed_surface_members))
-                denormed_batch_surface_ensembles.append(torch.stack(batch_denormalized))
-            # print('pred_denorm',torch.stack(denormed_surface_ensembles).shape)
-            # print(torch.stack(denormed_batch_surface_ensembles).shape)
-            
-            denormed_surface_ensembles = torch.stack(denormed_surface_ensembles).squeeze(3)
-            denormed_surface_ensembles = torch.swapdims(denormed_surface_ensembles,1,2)
-            denormed_batch_surface_ensembles = torch.stack(denormed_batch_surface_ensembles)
-            denormed_batch_surface_ensembles = torch.swapdims(denormed_batch_surface_ensembles,1,2)
-            denormed_batch_surface_ensembles = denormed_batch_surface_ensembles.expand(-1,self.num_ensemble_members,-1,-1,-1,-1)
-            
-            #should be same shape as normed data: [[batch,pred],num_batch_examples (diff IC), num_members, rollout_length,var,lat,lon]
-            denormed_data = torch.stack([denormed_batch_surface_ensembles,denormed_surface_ensembles])
+            denormed_data = unnormalize_data(data)
 
-            print(denormed_data[0,0,0,0,0,100,:100])
-            print(denormed_data[1,0,0,0,0,100,:100])
-            print(denormed_data[1,0,0,0,0,:,:].mean())
-            print(denormed_data[0,0,0,0,0,:,:].mean())
-
-
-            # print(denormed_data.shape)
             #calculate and plot sss and crps for timeseries
             for ic_index in range(self.num_batch_examples):
                 self.metrics = EnsembleMetrics(dataset=self.dataset).to(device)
                 output_metrics = []
                 for rollout_index in range(self.num_rollout_steps):
                     #needs to be [1, num_pred_members_per_sample (should be 1 for batch), variables, lat, lon]
-                    # print('batch for metrics',denormed_data[None,0,ic_index,:1,rollout_index].shape)
-                    # print(denormed_data[None,1,ic_index,:,rollout_index].shape)
-                    # print(denormed_data[None,1,ic_index,0,rollout_index].mean())
-                    # print(denormed_data[None,1,ic_index,1,rollout_index].mean())
-
                     self.metrics.update(
                         denormed_data[None,0,ic_index,:1,rollout_index],
                         denormed_data[None,1,ic_index,:,rollout_index]
@@ -518,6 +523,7 @@ class Diffusion(pl.LightningModule):
                     save=True,
                 denormalized=True
             )
+            return 
     
         
     def loss(self, pred, batch, lat_coeffs=None):
@@ -669,8 +675,9 @@ class Diffusion(pl.LightningModule):
                #  local_batch['surface_noisy'] = remove_outliers(local_batch['surface_noisy'])
                # steps.append(local_batch['surface_noisy'])
                 steps.append(local_batch['surface_noisy'])
-              #  print(local_batch['surface_noisy'].shape)
-              #  print(pred['next_state_surface'].shape)
+                # print(local_batch['surface_noisy'].shape)
+                # print(pred['next_state_surface'].shape)
+
                 #(alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
                # pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
 
