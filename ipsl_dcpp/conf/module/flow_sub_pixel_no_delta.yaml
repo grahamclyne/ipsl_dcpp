@@ -9,6 +9,7 @@ batch_size: 8
 z_normalize: False
 flattened_plev: True
 mask_value: 0
+normalization: 'climatology'
 
 module:
   _target_: ipsl_dcpp.model.diffusion.Diffusion
@@ -22,10 +23,12 @@ module:
   num_inference_steps: 75
   prediction_type: 'v_prediction'
   num_ensemble_members: 1
+  num_batch_examples: 2
   p_uncond: 0.0
   scheduler: 'flow'
   num_rollout_steps: 15
   elevation: True
+  month_embed: True
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather

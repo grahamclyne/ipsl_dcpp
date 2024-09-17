@@ -411,6 +411,8 @@ class Diffusion(pl.LightningModule):
                     output_metrics.append(torch.tensor(list(out.values())))
             sharpness.append(output_metrics)
         return sharpness
+
+    
     def predict_step(self,batch,batch_nb):        
         #make variable names for output
         var_names = self.dataset.surface_variables.copy()

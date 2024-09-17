@@ -7,6 +7,7 @@ import glob
 
 @hydra.main(config_path='./conf',config_name="config.yaml")
 def main(cfg: DictConfig):
+    work = os.environ['WORK']
     device = 'cuda'
     pl.seed_everything(cfg.seed)
     test = hydra.utils.instantiate(
@@ -34,7 +35,7 @@ def main(cfg: DictConfig):
     print(path)
     checkpoint_path = torch.load(path,map_location=torch.device('cuda'))
     pl_module.load_state_dict(checkpoint_path['state_dict'])
-    torch.save(pl_module.sharpness_test(),f'{cfg.name}_sharpnesses.pt')
+    torch.save(pl_module.sharpness_test(),f'{work}/ipsl_dcpp/ipsl_dcpp/{cfg.name}_sharpnesses.pt')
 
 if __name__ == "__main__":
     main()
