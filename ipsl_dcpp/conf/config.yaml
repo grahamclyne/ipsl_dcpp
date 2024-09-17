@@ -1,7 +1,7 @@
 defaults:
   - cluster: jean_zay_v100
   - dataloader: ipsl
-  - module: flow_3000
+  - module: flow_1500
   - override hydra/launcher: submitit_slurm
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none
@@ -9,11 +9,9 @@ defaults:
   
 #example of override: python run.py environment=cleps
 
-
 name: ${module.name}
 project: ${module.project}
 exp_dir: ${cluster.wandb_dir}${module.project}/${name}/
-
 
 seed: 0
 max_steps: 200000

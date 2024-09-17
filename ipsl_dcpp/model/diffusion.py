@@ -425,7 +425,7 @@ class Diffusion(pl.LightningModule):
         out_dir = f'./plots/{self.dataset.plot_output_path}/'
         os.makedirs(out_dir,exist_ok=True)
         batch_colors = ['blue','green','black']
-        data = make_rollout_and_batch_data()
+        data = self.make_rollout_and_batch_data()
         #shape is now [[batch,pred],num_batch_examples (diff IC), num_members, rollout_length,var,lat,lon]
         # print(data.shape)
 
@@ -461,7 +461,7 @@ class Diffusion(pl.LightningModule):
                     save=True
             )
 
-            denormed_data = unnormalize_data(data)
+            denormed_data = self.unnormalize_data(data)
 
             #calculate and plot sss and crps for timeseries
             for ic_index in range(self.num_batch_examples):

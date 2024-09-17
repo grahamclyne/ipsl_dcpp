@@ -26,7 +26,7 @@ module:
   num_batch_examples: 2
   p_uncond: 0.0
   scheduler: 'ddpm'
-  num_rollout_steps: 100
+  num_rollout_steps: 10
   elevation: True
   month_embed: True
 

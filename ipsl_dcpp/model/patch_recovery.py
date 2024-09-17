@@ -226,9 +226,10 @@ class PatchRecovery4(nn.Module):
         self.conv = nn.Conv2d(input_dim, output_dim * (upscale_factor ** 2), 3, 1, 1, bias=0)
         weight = ICNR(self.conv.weight, initializer=nn.init.kaiming_normal_,
                       upscale_factor=upscale_factor)
-        self.smooth_conv = nn.Conv2d(output_dim, output_dim, kernel_size=5, stride=1, padding=2)
-        self.smooth_conv1 = nn.Conv2d(output_dim, output_dim, kernel_size=3, stride=1, padding=1)
-        self.norm = nn.LayerNorm((output_dim,144,144))
+        if(self.smoothing):
+           self.smooth_conv = nn.Conv2d(output_dim, output_dim, kernel_size=5, stride=1, padding=2)
+           self.smooth_conv1 = nn.Conv2d(output_dim, output_dim, kernel_size=3, stride=1, padding=1)
+           self.norm = nn.LayerNorm((output_dim,144,144))
         self.conv.weight.data.copy_(weight)   # initialize conv.weight
 
     def forward(self, x):
