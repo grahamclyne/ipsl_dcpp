@@ -1,11 +1,11 @@
-name: flow_3000
+name: flow_sub_pixel_3000
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
 plev_variables: ['hur','hus','o3','ta','ua','va','wap','zg']
 #batch_size: ${eval:'16 if "${cluster.launcher.slurm_constraint}" == "a100" else 1'} #on a100
 delta: True
-batch_size: 8
+batch_size: 1 #on v100
 z_normalize: False
 flattened_plev: True
 mask_value: 0
@@ -20,14 +20,14 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 200
+  num_inference_steps: 75
   prediction_type: 'v_prediction'
   num_ensemble_members: 2
   num_batch_examples: 2
   p_uncond: 0.0
   scheduler: 'flow'
-  num_rollout_steps: 10
-  elevation: True
+  num_rollout_steps: 40
+  elevation: False
   month_embed: True
 
 backbone:
@@ -35,7 +35,7 @@ backbone:
   soil: False
   plev: False
   conv_head: False
-  sub_pixel: False
+  sub_pixel: True
   lon_resolution: 144
   lat_resolution: 143
   emb_dim: 576
@@ -48,7 +48,7 @@ backbone:
   position_embs_dim: 0
  # surface_ch: 31
  #31 surface variables and (3*8 level variables) * 3 for prev,current and next
-  surface_ch: 103
+  surface_ch: 102
   output_dim: 34
   level_ch: 0
   #level_ch: 8
@@ -56,3 +56,4 @@ backbone:
   use_skip: False
   cropped: False
   smoothing: False
+

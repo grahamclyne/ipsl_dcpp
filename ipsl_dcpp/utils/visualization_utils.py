@@ -69,7 +69,8 @@ def make_gif(
     var_name,
     file_name,
     save=False,
-    denormalized=False):
+    denormalized=False,
+    ffmpeg=False):
 
     #get dummy frame 
     scratch = os.environ['SCRATCH']
@@ -116,7 +117,7 @@ def make_gif(
 
     # plt.title(var_name)
     # tx = axes[0].set_title('Frame 0')
-   # colorbar = fig.colorbar(line, ax=axes[1])
+    colorbar = fig.colorbar(line, ax=axes[1])
     # def animate(i):
     #     arr = container[0][0]
     #     im = arr        
@@ -145,13 +146,11 @@ def make_gif(
     #     container.append([line,line1,title])
     # if(var_num < 10):
     #     plt.title(self.dataset.surface_variables[var_num])
-    writer = animation.FFMpegWriter(fps=1)
+    if(ffmpeg):
+        writer = animation.FFMpegWriter(fps=1)
     ani = animation.ArtistAnimation(fig, container)
     # ani.save(f'{out_dir}/diffusion_comparison_{var_names[var_num][0]}_ffmpeg.gif',writer=writer)
 
-
-    # writer = animation.FFMpegWriter(fps=2)
-    # ani = animation.FuncAnimation(fig, animate)
 
 #    ani = animation.ArtistAnimation(fig, container)
     if(save):

@@ -40,7 +40,7 @@ def search_by_value(d, search_value):
         if value == search_value:
             return key
 
-num_ensembles = 7
+num_ensembles = 10
 out_mapping = {}
 #want to make a map of each year to x num variables
 time = '1961-02'
@@ -55,32 +55,31 @@ for _ in range(0, 590):
     for index in indices:
         batch = train.__getitem__(search_by_value(train.id2pt,index))
         batch = {k:[batch[k]] if k == 'time' or k == 'next_time' else batch[k].unsqueeze(0) for k in batch.keys()}  #simulate lightnings batching dimension
-        denormed = train.denormalize(batch)
-        vals.append(denormed['state_surface'][0,0]) #only get tas
+        # denormed = train.denormalize(batch)
+        vals.append(batch['state_surface'][0,0]) #only get tas
     output = torch.stack(vals)
     # print(output.shape)
     # print(output.mean(axis=0).shape)
-    outputs.append(output.mean(axis=0))
-    # mean = output.mul(train.lat_coeffs_equi[0][0]).nanmean(axis=(-1,-2))
-    # std = denormed['state_surface'][0].nanstd()
+    # outputs.append(output.mean(axis=0))
+    mean = output.mul(train.lat_coeffs_equi[0][0]).nanmean(axis=(-1,-2))
 
         # print(batch.shape)
     
     # output = torch.stack(vals)
     # mean = output.mean()
     # std = output.std()
-    # means.append(mean.mean())
-    # stds.append(mean.std())
+    means.append(mean.mean())
+    stds.append(mean.std())
     # outputs.append(output)
    # out_mapping[str(ts[time_index*(num_ensembles+1)][2])[:7]] =  torch.stack(vals)
    # print(mean,std)
    # print(str(ts[time_index*(num_ensembles+1)][2])[:7])
-mean_file = open('long_means.pt','wb')
-mean_std = open('long_stds.pt','wb')
-output_file = open('spatial_ensemble_batch_mean.pt','wb')
+mean_file = open('normal_normalized_long_means_ipsl.pt','wb')
+mean_std = open('normal_normalized_long_stds_ipsl.pt','wb')
+#output_file = open('spatial_ensemble_batch_mean.pt','wb')
 # outputs_file = open('batch_long.pt','wb')
 
 # source, destination
-# torch.save(torch.stack(means), mean_file) 
-# torch.save(torch.stack(stds), mean_std) 
-torch.save(torch.stack(outputs), output_file) 
+torch.save(torch.stack(means), mean_file) 
+torch.save(torch.stack(stds), mean_std) 
+#torch.save(torch.stack(outputs), output_file) 
