@@ -31,7 +31,7 @@ main() {
     if [[ "$gpu_version" == "a100" ]]; then 
         python submit.py cluster="jean_zay_a100"
     else
-        python submit.py cluster="jean_zay_v100" batch_size=1
+        python submit.py cluster="jean_zay_v100" batch_size=4
     fi
 };
 

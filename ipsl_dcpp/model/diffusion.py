@@ -551,13 +551,16 @@ class Diffusion(pl.LightningModule):
         mask = batch['next_state_surface'] == self.dataset.mask_value
 
 
-        
-        mse_surface = (pred['next_state_surface'][~mask].squeeze() - batch['next_state_surface'][~mask].squeeze()).pow(2)
+        # print(mask.shape,'mask')
+        mse_surface = (pred['next_state_surface'][~mask].squeeze().reshape(-1,34,143,144) - batch['next_state_surface'][~mask].squeeze().reshape(-1,34,143,144)).pow(2)
         if(self.lat_weight):
             mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
         
-
-
+        xx = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
+        # print(xx.shape)
+        # print(mse_surface.shape)
+        # print(pred['next_state_surface'][~mask].squeeze().shape)
+        # print((pred['next_state_surface'].squeeze() - batch['next_state_surface'].squeeze()).pow(2).shape)
         if(self.backbone.plev):    
             mse_level = (pred['next_state_level'].squeeze() - batch['next_state_level'].squeeze()).pow(2)
             if mse_level.shape[-2] == 128:
