@@ -159,3 +159,94 @@ def make_gif(
         return ani
 
 
+
+def generate_monthly_dates(start_year, start_month, num_months):
+    dates = []
+    current_year = start_year
+    current_month = start_month
+
+    for _ in range(num_months):
+        # Create a date for the current year and month
+        date = datetime.datetime(current_year, current_month, 1)
+        dates.append(date)
+
+        # Increment the month
+        current_month += 1
+        # If month exceeds 12, reset to January and increment the year
+        if current_month > 12:
+            current_month = 1
+            current_year += 1
+
+    return dates
+import matplotlib.pyplot as plt
+import numpy as np
+import datetime
+
+def plot_with_fill(means, stds, bmeans,bstds,color='skyblue', alpha=0.3,axes=None):
+    """
+    Plots means with a filled area representing the standard deviations.
+    
+    Parameters:
+    - means: List or array of mean values.
+    - stds: List or array of standard deviation values.
+    - color: Color of the filled area. Default is 'skyblue'.
+    - alpha: Transparency level of the filled area. Default is 0.3.
+    """
+    x = generate_monthly_dates(1961,1,len(means))
+    import matplotlib.dates as mdates
+    # myFmt = mdates.DateFormatter('%M-%Y')
+    # fig,axes=plt.subplots(1,figsize=(12, 6))
+    # x = np.arange(len(means))  # X values (e.g., 0, 1, 2, ..., len(means)-1)
+    # base = datetime.datetime.today()
+    # x = [base - datetime.timedelta(month=1) for x in range(590)]
+    # Calculate the upper and lower bounds of the shaded area
+    pred_upper_bound = means + stds
+    pred_lower_bound = means - stds
+
+    pred_upper_bound2 = means + stds*2
+    pred_lower_bound2 = means - stds*2
+    batch_upper_bound = bmeans + bstds
+    batch_lower_bound = bmeans - bstds
+    # axes.xaxis.set_major_formatter(myFmt)
+
+    # Plot the means
+    axes.plot(x, means.cpu(), color='red', label='Predicted Mean')
+    axes.plot(x, bmeans.cpu(), color='blue', label='IPSL Mean')
+
+    # Fill the area between the upper and lower bounds
+    axes.fill_between(x, pred_lower_bound.cpu(), pred_upper_bound.cpu(), color='red', alpha=alpha, label='±1 Pred Std Dev')
+    # plt.fill_between(x, pred_lower_bound2, pred_upper_bound2, color='pink', alpha=alpha, label='±2 Std Dev')
+
+    axes.fill_between(x, batch_upper_bound.cpu(), batch_lower_bound.cpu(), color='skyblue', alpha=alpha, label='±1 IPSL Std Dev')
+    # plt.fill_between(x, batch_upper_bound, batch_lower_bound, color='lightblue', alpha=alpha, label='±1 Std Dev')
+    # years = mdates.YearLocator()   # every year
+    # months = mdates.MonthLocator()  # every month
+    # years_fmt = mdates.DateFormatter('%d')
+    
+
+    dtFmt = mdates.DateFormatter('%Y') # define the formatting
+
+    axes.xaxis.set_major_locator(mdates.MonthLocator(interval=48))
+    # axes.xaxis.set_major_formatter(years_fmt)
+    # axes.xaxis.set_minor_locator(months)
+    # Add labels and legend
+    # plt.xlabel('Month')
+    # plt.ylabel('Temperature at Surface')
+    # plt.title('Mean and Standard Deviation of Temperature At Surface')
+    # plt.legend()
+    # datemin = np.datetime64('1960', 'Y')
+    # datemax = np.datetime64('1960', 'Y') + np.timedelta64(59, 'Y')
+    # axes.format_xdata = mdates.DateFormatter('%Y-%m')
+    
+    axes.xaxis.set_major_formatter(dtFmt) 
+    # show every 12th tick on x axes
+    # plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+    for label in axes.get_xticklabels(which='major'):
+        label.set(rotation=0, fontweight='light')
+    # axes.set_xticks(rotation=0, fontweight='light',  fontsize='x-small',ticks=)
+    # axes.set_xlim(datemin, datemax)
+    # Show the plot
+    # plt.show()
+    # plt.savefig('long_rollout.png')
+    return axes
+

@@ -5,7 +5,7 @@ wandb_mode: offline
 manual_requeue: True
 
 precision: 16-mixed
-gpus: 2
+gpus: 3
 cpus: 8
 
 folder: /lustre/fsn1/projects/rech/mlr/udy16au/model_output/sblogs/${name}/

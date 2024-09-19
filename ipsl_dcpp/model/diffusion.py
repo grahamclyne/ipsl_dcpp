@@ -11,9 +11,8 @@ import matplotlib.pyplot as plt
 import xarray as xr
 from matplotlib import animation
 from copy import deepcopy
-from ipsl_dcpp.utils.visualization_utils import make_gif,el_nino_34_index
+from ipsl_dcpp.utils.visualization_utils import make_gif,el_nino_34_index,plot_with_fill
 from pathlib import Path
-
 
    #  fig, axes = plt.subplots(1,1, figsize=(16, 6))
    #  var_num = -1
@@ -77,7 +76,8 @@ class Diffusion(pl.LightningModule):
         num_batch_examples,
         scheduler,
         elevation,
-        month_embed
+        month_embed,
+        lat_weight
     ):
         super().__init__()
         self.__dict__.update(locals())
@@ -94,6 +94,7 @@ class Diffusion(pl.LightningModule):
         self.num_batch_examples = num_batch_examples
         self.elevation = elevation
         self.month_embed = month_embed
+        self.lat_weight = lat_weight
         if scheduler == 'ddpm':
             self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_diffusion_timesteps,
                                                            beta_schedule='squaredcos_cap_v2',
@@ -431,7 +432,7 @@ class Diffusion(pl.LightningModule):
 
         #make plots for each variable in the set
         for var_num in range(0,34):
-            fig, axes = plt.subplots(6, figsize=(16, 16))
+            fig, axes = plt.subplots(7, figsize=(16, 16))
             axes = axes.flatten()
 
 
@@ -458,7 +459,9 @@ class Diffusion(pl.LightningModule):
                     rollout_length=self.num_rollout_steps,
                     var_name=var_names[var_num],
                     file_name=f'{out_dir}/normalized_diffusion_comparison_{var_names[var_num][0]}_ffmpeg',
-                    save=True
+                    save=True,
+                                ffmpeg=True
+
             )
 
             denormed_data = self.unnormalize_data(data)
@@ -490,6 +493,18 @@ class Diffusion(pl.LightningModule):
                 fig.tight_layout()
 
 
+#[[batch,pred],num_batch_examples (diff IC), num_members, rollout_length,var,lat,lon]
+            #plot bias 
+            for ic_index in range(self.num_batch_examples):
+                pred_means = denormed_data[1,ic_index,:,:,var_num].mul(self.dataset.lat_coeffs_equi[None:,:,:].to(device)).mean(axis=(-4,-2,-1)).squeeze()
+                batch_means = denormed_data[0,ic_index,0,:,var_num].mul(self.dataset.lat_coeffs_equi[:,:,:].to(device)).mean(axis=(-1,-2)).squeeze()
+                pred_stds = pred_means.std(axis=(0))
+                batch_stds = batch_means.std(axis=(0))
+                plot_with_fill(pred_means, pred_stds, batch_means,batch_stds,axes=axes[6])
+                axes[6].set_title('unnormalized comp')
+
+                
+            
             #plot elnino34 indices 
 
             if(var_num == 9): #aka its top of surface sea temp
@@ -523,7 +538,8 @@ class Diffusion(pl.LightningModule):
                     var_name=var_names[var_num],
                     file_name=f'{out_dir}/denormalized_diffusion_comparison_{var_names[var_num][0]}_ffmpeg',
                     save=True,
-                denormalized=True
+                denormalized=True,
+                ffmpeg=True
             )
             return 
     
@@ -537,8 +553,9 @@ class Diffusion(pl.LightningModule):
 
         
         mse_surface = (pred['next_state_surface'][~mask].squeeze() - batch['next_state_surface'][~mask].squeeze()).pow(2)
-        mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
-
+        if(self.lat_weight):
+            mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
+        
 
 
         if(self.backbone.plev):    
