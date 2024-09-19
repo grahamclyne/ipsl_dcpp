@@ -6,7 +6,7 @@ defaults:
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none
   - _self_
-  
+      
 #example of override: python run.py environment=cleps
 
 name: ${module.name}

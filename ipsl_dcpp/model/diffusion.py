@@ -551,8 +551,8 @@ class Diffusion(pl.LightningModule):
         mask = batch['next_state_surface'] == self.dataset.mask_value
 
 
-        # print(mask.shape,'mask')
-        mse_surface = (pred['next_state_surface'][~mask].squeeze().reshape(-1,34,143,144) - batch['next_state_surface'][~mask].squeeze().reshape(-1,34,143,144)).pow(2)
+        #print(mask.shape,'mask')
+        mse_surface = (pred['next_state_surface'][~mask].reshape(-1,34,143,144) - batch['next_state_surface'][~mask].reshape(-1,34,143,144)).pow(2)
         if(self.lat_weight):
             mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
         
