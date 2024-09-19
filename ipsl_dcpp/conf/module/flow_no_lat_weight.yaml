@@ -27,10 +27,10 @@ module:
   num_batch_examples: 2
   p_uncond: 0.0
   scheduler: 'flow'
-  num_rollout_steps: 120
+  num_rollout_steps: 10
   elevation: True
   month_embed: True
-  lat_weight: True
+  lat_weight: False
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
