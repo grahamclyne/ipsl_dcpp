@@ -6,7 +6,7 @@ manual_requeue: True
 
 precision: 16-mixed
 gpus: 4
-cpus: 8
+cpus: 10
 
 folder: /lustre/fsn1/projects/rech/mlr/udy16au/model_output/sblogs/${name}/
 
@@ -18,8 +18,8 @@ launcher:
     timeout_min: 1200
     name: ${name}
   #  slurm_qos: qos_gpu-dev 
-    slurm_partition: gpu_p2
-    slurm_constraint: v100
+  #  slurm_partition: gpu_p2
+    slurm_constraint: v100-32g
     slurm_account: mlr@v100
     slurm_additional_parameters:
       hint: nomultithread
