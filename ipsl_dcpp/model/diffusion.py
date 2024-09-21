@@ -548,17 +548,21 @@ class Diffusion(pl.LightningModule):
         if lat_coeffs is None:
             lat_coeffs = self.dataset.lat_coeffs_equi
         device = batch['next_state_surface'].device
-        mask = batch['next_state_surface'] == self.dataset.mask_value
+        mask = batch['next_state_surface'] != self.dataset.mask_value
 
-
-        #print(mask.shape,'mask')
-        mse_surface = (pred['next_state_surface'][~mask].reshape(-1,34,143,144) - batch['next_state_surface'][~mask].reshape(-1,34,143,144)).pow(2)
+        
+        print(mask.shape,'mask')
+        # print(pred['next_state_surface'].shape)
+        # print(pred['next_state_surface'][~mask].shape)
+        print((pred['next_state_surface'] * mask).shape)
+        mse_surface = ((pred['next_state_surface'] * mask) - (batch['next_state_surface'] * mask)).pow(2)
         if(self.lat_weight):
             mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
         
-        xx = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
+       # xx = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
         # print(xx.shape)
-        # print(mse_surface.shape)
+        print(lat_coeffs.shape)
+        print(mse_surface.shape)
         # print(pred['next_state_surface'][~mask].squeeze().shape)
         # print((pred['next_state_surface'].squeeze() - batch['next_state_surface'].squeeze()).pow(2).shape)
         if(self.backbone.plev):    
@@ -567,12 +571,11 @@ class Diffusion(pl.LightningModule):
                 mse_level = mse_level[..., 4:-4, 8:-8]
             mse_level = mse_level.mul(lat_coeffs.to(device))
             mse_level_w = mse_level.mul(level_coeffs.to(device))
-    
-        if(self.backbone.plev):
             loss = (mse_surface.sum(1).mean((-3, -2, -1)) + 
                 mse_level_w.sum(1).mean((-3, -2, -1)))
         else:
-            loss = mse_surface.sum(1).mean((-3, -2, -1))
+            loss = mse_surface.sum(0).mean((-3, -2, -1))
+            print(loss.shape)
         return loss
 
 
