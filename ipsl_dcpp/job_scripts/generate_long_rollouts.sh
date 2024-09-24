@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=diffusion_rollout     # job name
+#SBATCH --job-name=long_rollout_predictions   # job name
 #SBATCH --ntasks-per-node=1          # this needs to correspond with # of GPUS
 #SBATCH --cpus-per-task=10      # number of cores per tasks, see how many GPUs per node and take proportional amount of CPUs
 #SBATCH --hint=nomultithread         # we get physical cores not logical
-#SBATCH --time=10:00:00              # maximum execution time (HH:MM:SS)
+#SBATCH --time=20:00:00              # maximum execution time (HH:MM:SS)
 #SBATCH --account=mlr@v100
 #SBATCH --gpus=1
 

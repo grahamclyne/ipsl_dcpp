@@ -1,4 +1,4 @@
-name: flow_proper_lat_weight_1
+name: flow_proper_lat_weight_no_clima
 project: ipsl_diffusion
 parent: flow_1500
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
@@ -10,7 +10,7 @@ batch_size: 4
 z_normalize: False
 flattened_plev: True
 mask_value: 0
-normalization: 'climatology'
+normalization: 'normal'
 
 module:
   _target_: ipsl_dcpp.model.diffusion.Diffusion
@@ -21,7 +21,7 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 300
+  num_inference_steps: 20
   prediction_type: 'v_prediction'
   num_ensemble_members: 1
   num_batch_examples: 1

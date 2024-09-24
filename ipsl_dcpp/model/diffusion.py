@@ -77,7 +77,8 @@ class Diffusion(pl.LightningModule):
         scheduler,
         elevation,
         month_embed,
-        lat_weight
+        lat_weight,
+        s_churn
     ):
         super().__init__()
         self.__dict__.update(locals())
@@ -95,6 +96,7 @@ class Diffusion(pl.LightningModule):
         self.elevation = elevation
         self.month_embed = month_embed
         self.lat_weight = lat_weight
+        self.s_churn = s_churn
         if scheduler == 'ddpm':
             self.noise_scheduler = diffusers.DDPMScheduler(num_train_timesteps=num_diffusion_timesteps,
                                                            beta_schedule='squaredcos_cap_v2',
@@ -303,7 +305,7 @@ class Diffusion(pl.LightningModule):
     def test_step(self,batch,batch_nb):
         out_dir = f'./plots/{self.dataset.plot_output_path}_long_rollout/'
         os.makedirs(out_dir,exist_ok=True)
-        for ensemble_member in range(0,7):
+        for ensemble_member in range(0,8):
             rollout = self.sample_rollout(batch,rollout_length=118*5,seed = ensemble_member)
             torch.save(torch.stack(rollout['state_surface']),f'{out_dir}/long_rollout_{ensemble_member}.pt')
 
@@ -541,7 +543,7 @@ class Diffusion(pl.LightningModule):
                 denormalized=True,
                 ffmpeg=True
             )
-            return 
+        return 
     
         
     def loss(self, pred, batch, lat_coeffs=None):
@@ -551,18 +553,17 @@ class Diffusion(pl.LightningModule):
         mask = batch['next_state_surface'] != self.dataset.mask_value
 
         
-        print(mask.shape,'mask')
+     #   print(mask.shape,'mask')
         # print(pred['next_state_surface'].shape)
         # print(pred['next_state_surface'][~mask].shape)
-        print((pred['next_state_surface'] * mask).shape)
+      #  print((pred['next_state_surface'] * mask).shape)
         mse_surface = ((pred['next_state_surface'] * mask) - (batch['next_state_surface'] * mask)).pow(2)
         if(self.lat_weight):
             mse_surface = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
         
        # xx = mse_surface.mul(lat_coeffs.to(device)) # latitude coeffs
         # print(xx.shape)
-        print(lat_coeffs.shape)
-        print(mse_surface.shape)
+       ##print(mse_surface.shape)
         # print(pred['next_state_surface'][~mask].squeeze().shape)
         # print((pred['next_state_surface'].squeeze() - batch['next_state_surface'].squeeze()).pow(2).shape)
         if(self.backbone.plev):    
@@ -575,7 +576,7 @@ class Diffusion(pl.LightningModule):
                 mse_level_w.sum(1).mean((-3, -2, -1)))
         else:
             loss = mse_surface.sum(0).mean((-3, -2, -1))
-            print(loss.shape)
+       #     print(loss.shape)
         return loss
 
 
@@ -687,7 +688,7 @@ class Diffusion(pl.LightningModule):
                 
                 local_batch['surface_noisy'] = scheduler.step(pred['next_state_surface'], t, 
                                                             local_batch['surface_noisy'], 
-                                                            generator=generator).prev_sample
+                                                            generator=generator,s_churn=self.s_churn).prev_sample
                 # original_sample = scheduler.step(pred['next_state_surface'], t, 
                 #                                             local_batch['surface_noisy'], 
                 #                                             generator=generator).pred_original_sample

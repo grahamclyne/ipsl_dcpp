@@ -153,8 +153,11 @@ def make_gif(
 
 
 #    ani = animation.ArtistAnimation(fig, container)
-    if(save):
+    if(save and ffmpeg):
         ani.save(f'{file_name}.gif',writer=writer)
+    elif(save):
+        ani.save(f'{file_name}.gif',fps=1)
+
     else:
         return ani
 

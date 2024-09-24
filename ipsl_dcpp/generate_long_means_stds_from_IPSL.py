@@ -40,14 +40,13 @@ def search_by_value(d, search_value):
         if value == search_value:
             return key
 
-num_ensembles = 10
 out_mapping = {}
 #want to make a map of each year to x num variables
 time = '1961-02'
 means = []
 stds = []
 outputs = []
-var_index = 8
+var_index = 9
 for _ in range(0, 590):
     print(time)
     vals = []
