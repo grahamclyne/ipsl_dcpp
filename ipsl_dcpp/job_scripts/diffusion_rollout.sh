@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=10     # number of cores per tasks, see how many GPUs per node and take proportional amount of CPUs
 #SBATCH --hint=nomultithread         # we get physical cores not logical
 ##SBATCH --partition=gpu_p5
-#SBATCH --constraint=a100
+#SBATCH --constraint=v100
 #SBATCH --time=05:00:00              # maximum execution time (HH:MM:SS)
 #SBATCH --account=mlr@v100
 #SBATCH --gpus=1
