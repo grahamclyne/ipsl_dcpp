@@ -80,12 +80,15 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                 self.z_means = np.expand_dims(np.nanmean(np.load(f'{self.data_path}/reference_data/after_climatology_surface_means_ensemble_split.npy'),axis=0),(-2,-1))
                 self.z_stds = np.expand_dims(np.nanmean(np.load(f'{self.data_path}/reference_data/after_climatology_surface_stds_ensemble_split.npy'),axis=0),(-2,-1))
         elif (self.normalization == 'normal'):
-            self.surface_means = torch.tensor(np.broadcast_to(
-                np.expand_dims(np.load(f'{self.data_path}/reference_data/variable_surface_means_ensemble_split.npy'),(-2,-1)),(34,143,144)))
+          #  self.surface_means = torch.tensor(np.broadcast_to(
+           #     np.expand_dims(np.load(f'{self.data_path}/reference_data/variable_surface_means_ensemble_split.npy'),(-2,-1)),(34,143,144)))
+            self.surface_means = torch.tensor(np.load(f'{self.data_path}/reference_data/variable_surface_means_ensemble_split.npy'))
             self.surface_stds = torch.tensor(np.broadcast_to(
                 np.expand_dims(np.load(f'{self.data_path}/reference_data/variable_surface_stds_ensemble_split.npy'),(-2,-1)),(34,143,144)))
-            self.plev_means = torch.tensor(np.broadcast_to(
-                np.expand_dims(np.load(f'{self.data_path}/reference_data/variable_surface_means_ensemble_split.npy'),(-2,-1)),(34,143,144)))[10:].reshape(8,3,143,144)
+          #  self.plev_means = torch.tensor(np.broadcast_to(
+          #      np.expand_dims(np.load(f'{self.data_path}/reference_data/variable_surface_means_ensemble_split.npy'),(-2,-1)),(34,143,144)))[10:].reshape(8,3,143,144)
+            self.plev_means = torch.tensor(np.load(f'{self.data_path}/reference_data/variable_surface_means_ensemble_split.npy'))[10:].reshape(8,3,143,144)
+
             self.plev_stds = torch.tensor(np.broadcast_to(
                 np.expand_dims(np.load(f'{self.data_path}/reference_data/variable_surface_stds_ensemble_split.npy'),(-2,-1)),(34,143,144)))[10:].reshape(8,3,143,144)
         elif(self.normalization == 'spatial_normal'):

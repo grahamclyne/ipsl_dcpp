@@ -1,4 +1,4 @@
-name: flow_spatial_norm
+name: flow_proper_no_delta
 project: ipsl_diffusion
 parent: flow_1500
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
@@ -10,7 +10,7 @@ batch_size: 4
 z_normalize: False
 flattened_plev: True
 mask_value: 0
-normalization: 'normal'
+normalization: 'climatology'
 
 module:
   _target_: ipsl_dcpp.model.diffusion.Diffusion

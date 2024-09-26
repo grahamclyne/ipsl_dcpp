@@ -1,7 +1,7 @@
 defaults:
   - cluster: jean_zay_v100
   - dataloader: ipsl
-  - module: flow_proper_no_delta
+  - module: flow_spatial_norm
   - override hydra/launcher: submitit_slurm
   - override hydra/job_logging: none
   - override hydra/hydra_logging: none
@@ -26,7 +26,7 @@ debug: False
 log: ${eval:'not ${debug}'} #wandb logging
 
 #put load_ckpt here
-load_ckpt: /lustre/fsn1/projects/rech/mlr/udy16au/model_output/ipsl_diffusion/${module.name}/checkpoints/checkpoint_global_step=95000.ckpt
+#load_ckpt: /lustre/fsn1/projects/rech/mlr/udy16au/model_output/ipsl_diffusion/${module.name}/checkpoints/checkpoint_global_step=95000.ckpt
 
 
 # sweeper:

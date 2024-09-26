@@ -190,7 +190,7 @@ def main(cfg: DictConfig):
 
 
     #first, check if exp exists
-    if Path(cfg.exp_dir).exists():
+    if Path(cfg.exp_dir).exists() and not cfg.debug:
         print('Experiment already exists. Trying to resume it.')
         exp_cfg = OmegaConf.load(Path(cfg.exp_dir) / 'config.yaml')
         if cfg.resume:
