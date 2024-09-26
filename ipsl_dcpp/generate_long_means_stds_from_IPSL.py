@@ -46,7 +46,7 @@ time = '1961-02'
 means = []
 stds = []
 outputs = []
-var_index = 9
+var_index = 8
 for _ in range(0, 590):
     print(time)
     vals = []
@@ -60,7 +60,7 @@ for _ in range(0, 590):
     output = torch.stack(vals)
     # print(output.shape)
     # print(output.mean(axis=0).shape)
-    # outputs.append(output.mean(axis=0))
+    outputs.append(output.mean(axis=0))
     # mean = output.mul(train.lat_coeffs_equi[0][0]).nanmean(axis=(-1,-2))
 
         # print(batch.shape)
@@ -69,7 +69,7 @@ for _ in range(0, 590):
     # std = output.std()
     # means.append(mean.mean())
     # stds.append(mean.std())
-    outputs.append(output)
+    #outputs.append(output)
    # out_mapping[str(ts[time_index*(num_ensembles+1)][2])[:7]] =  torch.stack(vals)
    # print(mean,std)
    # print(str(ts[time_index*(num_ensembles+1)][2])[:7])

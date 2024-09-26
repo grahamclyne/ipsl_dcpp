@@ -21,10 +21,10 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 300
+  num_inference_steps: 50
   prediction_type: 'v_prediction'
-  num_ensemble_members: 1
-  num_batch_examples: 1
+  num_ensemble_members: 2
+  num_batch_examples: 2
   p_uncond: 0.0
   scheduler: 'flow'
   num_rollout_steps: 40

@@ -37,22 +37,22 @@ train = hydra.utils.instantiate(
 #iter_batch = iter(train_dataloader)
 surface = []
 
-for count in range(4000):
+for count in range(5000):
     sample_idx = torch.randint(len(train), size=(1,)).item()
     batch = train[sample_idx]
     surface.append(batch['state_surface'].squeeze())
     print(batch['state_surface'].shape)
 
 surface = np.stack(surface)
-surface_means = np.nanmean(surface,axis=(0,2,3))
+surface_means = np.nanmean(surface,axis=(0))
 surface_stds = np.nanstd(surface,axis=(0,2,3))
 #depth_month_means = [np.nanmean(np.array(x),axis=0) for x in depth_months]
 #depth_month_stds = [np.nanstd(np.array(x),axis=(0,3,4)) for x in depth_months]
 # plev_month_means = [np.nanmean(np.stack(x),axis=0) for x in plev_months]
 # plev_month_stds = [np.nanstd(np.stack(x),axis=(0,3,4)) for x in plev_months]
 
-np.save('variable_surface_means_ensemble_split.npy',surface_means)
-np.save('variable_surface_stds_ensemble_split.npy',surface_stds)
+np.save('1variable_surface_means_ensemble_split.npy',surface_means)
+np.save('1variable_surface_stds_ensemble_split.npy',surface_stds)
 #np.save('climatology_depth_means.npy',np.stack(depth_month_means))
 #np.save('climatology_depth_stds.npy',np.stack(depth_month_stds))
 # np.save('climatology_plev_means_ensemble_split.npy',np.stack(plev_month_means))
