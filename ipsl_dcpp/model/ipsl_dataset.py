@@ -82,15 +82,15 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         elif (self.normalization == 'normal'):
           #  self.surface_means = torch.tensor(np.broadcast_to(
            #     np.expand_dims(np.load(f'{self.data_path}/reference_data/variable_surface_means_ensemble_split.npy'),(-2,-1)),(34,143,144)))
-            self.surface_means = torch.tensor(np.load(f'{self.data_path}/reference_data/variable_surface_means_ensemble_split.npy'))
+            self.surface_means = torch.tensor(np.load(f'{self.data_path}/reference_data/spatial_variable_surface_means_ensemble_split.npy'))
             self.surface_stds = torch.tensor(np.broadcast_to(
-                np.expand_dims(np.load(f'{self.data_path}/reference_data/variable_surface_stds_ensemble_split.npy'),(-2,-1)),(34,143,144)))
+                np.expand_dims(np.load(f'{self.data_path}/reference_data/spatial_variable_surface_stds_ensemble_split.npy'),(-2,-1)),(34,143,144)))
           #  self.plev_means = torch.tensor(np.broadcast_to(
           #      np.expand_dims(np.load(f'{self.data_path}/reference_data/variable_surface_means_ensemble_split.npy'),(-2,-1)),(34,143,144)))[10:].reshape(8,3,143,144)
-            self.plev_means = torch.tensor(np.load(f'{self.data_path}/reference_data/variable_surface_means_ensemble_split.npy'))[10:].reshape(8,3,143,144)
+            self.plev_means = torch.tensor(np.load(f'{self.data_path}/reference_data/spatial_variable_surface_means_ensemble_split.npy'))[10:].reshape(8,3,143,144)
 
             self.plev_stds = torch.tensor(np.broadcast_to(
-                np.expand_dims(np.load(f'{self.data_path}/reference_data/variable_surface_stds_ensemble_split.npy'),(-2,-1)),(34,143,144)))[10:].reshape(8,3,143,144)
+                np.expand_dims(np.load(f'{self.data_path}/reference_data/spatial_variable_surface_stds_ensemble_split.npy'),(-2,-1)),(34,143,144)))[10:].reshape(8,3,143,144)
         elif(self.normalization == 'spatial_normal'):
             self.surface_means = np.load(f'{self.data_path}/reference_data/spatial_multi_var_surface_means.npy').squeeze()
             self.surface_stds = np.nanmean(np.load(f'{self.data_path}/reference_data/spatial_multi_var_surface_stds.npy').squeeze(),axis=(-2,-1),keepdims=True)
