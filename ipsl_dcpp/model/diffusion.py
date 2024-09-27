@@ -77,6 +77,7 @@ class Diffusion(pl.LightningModule):
         scheduler,
         elevation,
         month_embed,
+        year_embed,
         lat_weight,
         s_churn
     ):
@@ -95,6 +96,7 @@ class Diffusion(pl.LightningModule):
         self.num_batch_examples = num_batch_examples
         self.elevation = elevation
         self.month_embed = month_embed
+        self.year_embed = year_embed
         self.lat_weight = lat_weight
         self.s_churn = s_churn
         if scheduler == 'ddpm':
@@ -148,19 +150,21 @@ class Diffusion(pl.LightningModule):
         # print('batch_time',batch['time'])
 
 
-        year = torch.tensor([int(x[0:4]) for x in batch['time']]).to(device)
-        year_emb = self.month_embedder(year)
+
         timestep_emb = self.timestep_embedder(timesteps)
         ch4_emb = self.timestep_embedder(batch['forcings'][:,0])
         cfc11_emb = self.timestep_embedder(batch['forcings'][:,1])
         cfc12_emb = self.timestep_embedder(batch['forcings'][:,2])
         c02_emb = self.timestep_embedder(batch['forcings'][:,3])
+        cond_emb =  timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb
         if(self.month_embed):
             month = torch.tensor([int(x[5:7]) for x in batch['time']]).to(device)
             month_emb = self.month_embedder(month)
-            cond_emb = (month_emb + year_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb)
-        else:
-            cond_emb = (year_emb + timestep_emb + ch4_emb + cfc11_emb + cfc12_emb + c02_emb)
+            cond_emb = month_emb + cond_emb
+        if(self.year_embed):
+            year = torch.tensor([int(x[0:4]) for x in batch['time']]).to(device)
+            year_emb = self.month_embedder(year)
+            cond_emb = year_emb + cond_emb
         for wavelength_index in range(len(batch['solar_forcings'][0])):
             cond_emb += self.timestep_embedder(batch['solar_forcings'][:,wavelength_index]) 
         out = self.backbone(batch, cond_emb)

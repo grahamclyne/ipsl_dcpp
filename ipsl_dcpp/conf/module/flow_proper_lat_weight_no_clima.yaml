@@ -30,6 +30,7 @@ module:
   num_rollout_steps: 40
   elevation: True
   month_embed: True
+  year_embed: True
   lat_weight: True
   s_churn: 0
 
