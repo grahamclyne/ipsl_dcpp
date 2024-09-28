@@ -82,7 +82,7 @@ class PatchRecovery2D(nn.Module):
     def forward(self, x):
         output = self.conv(x)
       #  output = self.conv1(output)
-       # print('output',output.shape)
+    #    print('output',output.shape)
         _, _, H, W = output.shape
         h_pad = H - self.img_size[0]
         w_pad = W - self.img_size[1]
@@ -92,9 +92,10 @@ class PatchRecovery2D(nn.Module):
 
         padding_left = w_pad // 2
         padding_right = int(w_pad - padding_left)
-       # print(padding_top,padding_bottom,padding_left,padding_right)
-        # print(output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right].shape)
-        return output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right]
+      #  print(padding_top,padding_bottom,padding_left,padding_right)
+     #   print(output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right].shape)
+    #    return output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right]
+        return output
        # return output[:,:,1:,:] #aka bottom_crop
       #  return output[:,:,:,:]
 

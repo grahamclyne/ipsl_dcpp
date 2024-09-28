@@ -1,4 +1,4 @@
-name: flow_proper_sub_pixel
+name: flow_144
 project: ipsl_diffusion
 parent: flow_proper_lat_weight_1
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
@@ -21,10 +21,10 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 150
+  num_inference_steps: 50
   prediction_type: 'v_prediction'
-  num_ensemble_members: 2
-  num_batch_examples: 2
+  num_ensemble_members: 1
+  num_batch_examples: 1
   p_uncond: 0.0
   scheduler: 'flow'
   num_rollout_steps: 40
@@ -39,9 +39,9 @@ backbone:
   soil: False
   plev: False
   conv_head: False
-  sub_pixel: True
+  sub_pixel: False
   lon_resolution: 144
-  lat_resolution: 143
+  lat_resolution: 144
   emb_dim: 576
   cond_dim: 256
   num_heads: [6, 12, 12, 6]

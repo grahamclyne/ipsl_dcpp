@@ -13,3 +13,4 @@ dataset:
   z_normalize: ${module.z_normalize}
   mask_value: ${module.mask_value}
   plot_output_path: ${module.name}_${module.module.num_inference_steps}_${module.module.num_ensemble_members}
+  lat_dim: ${module.backbone.lat_resolution}
