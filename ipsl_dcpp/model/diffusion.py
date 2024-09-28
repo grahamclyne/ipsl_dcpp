@@ -590,16 +590,17 @@ class Diffusion(pl.LightningModule):
         history = dict(state_surface=[],next_state_surface=[])
         next_time = batch['next_time']    
         inc_time_vec = np.vectorize(inc_time)
-        nulls = torch.where(batch['state_surface']==0,1.0,0.0)     
+        nulls = torch.where(batch['state_surface']==0,1.0,0.0)
+        print(batch)
         for i in range(rollout_length):
             start = time.time()
             print('before sampling',batch['time'])
-            sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler=self.scheduler,seed=100000*seed + i)
+            sample = self.sample(batch, denormalize=False,num_inference_steps=self.num_inference_steps,scheduler=self.scheduler,seed=100000*seed + i,visualize=False)
             next_time = batch['next_time']    
             print('after sampling',batch['time'])
-            cur_year_index = int(next_time[0].split('-')[0]) - 1960
+            cur_year_index = int(next_time[0].split('-')[0]) - 1961
             cur_month_index = int(next_time[0].split('-')[-1]) - 1
-            
+         #   print(sample['next_state_surface'])
             if(self.dataset.delta):
                 new_state_surface=sample['next_state_surface'][:,:10].to(device)*self.dataset.surface_delta_stds.to(device).unsqueeze(0) + batch['state_surface'][:,:10].to(device)
                 if(self.dataset.flattened_plev):
@@ -607,19 +608,30 @@ class Diffusion(pl.LightningModule):
                     new_state_surface = torch.concatenate([new_state_surface,new_state_plev],axis=1)
             else:
                 new_state_surface=sample['next_state_surface']
+          #  print(sample['next_state_surface'])
             batch['state_surface'] = torch.where(nulls==1.0,0,batch['state_surface'])
             new_state_surface = torch.where(nulls==1.0,0,new_state_surface)
             history['next_state_surface'].append(new_state_surface)
             history['state_surface'].append(batch['state_surface'])
+            # print(cur_year_index)
+            # print(cur_month_index)
+            # print(batch['forcings'].shape) 
+            # print(batch['solar_forcings'].shape)   
+            # print(self.dataset.atmos_forcings.shape)
+            # print(self.dataset.solar_forcings.shape)
+            # print(torch.tensor(self.dataset.atmos_forcings[:,cur_year_index]).unsqueeze(0).shape)
+            # print(torch.Tensor(self.dataset.atmos_forcings[:,cur_year_index]).unsqueeze(0).shape)
+            print(torch.Tensor(self.dataset.solar_forcings[cur_year_index,cur_month_index]).unsqueeze(0).shape)
             batch = dict(state_surface=new_state_surface,
-                         prev_state_surface=batch['state_surface'],
+                         prev_state_surface=sample['state_surface'],
                          time=next_time,
                          state_constant=batch['state_constant'],
-                         forcings=torch.Tensor(self.dataset.atmos_forcings[:,cur_year_index]).unsqueeze(0).to(device), #I have no idea why i need to unsqueeze here does lightning add a dimenions with the batch? who knows
+                         forcings=torch.Tensor(self.dataset.atmos_forcings[None,:,cur_year_index]).to(device),
                          state_depth=torch.empty(0),
-                         solar_forcings=torch.Tensor(self.dataset.solar_forcings[cur_year_index,cur_month_index]).unsqueeze(0).to(device),
+                         solar_forcings=torch.Tensor(self.dataset.solar_forcings[None,cur_year_index,cur_month_index]).to(device),
                          next_time=inc_time_vec(next_time)
                         )
+            # batch['state_surface'] = new_state_surface
             end = time.time()
             print(f'sample {i} took {end - start} to run')
         return history
@@ -632,6 +644,7 @@ class Diffusion(pl.LightningModule):
                 denormalize,
                 seed=0,
                 cf_guidance=None,
+                visualize=False
                 ):
         if cf_guidance is None:
             cf_guidance = 1
@@ -660,7 +673,7 @@ class Diffusion(pl.LightningModule):
 
         scheduler.set_timesteps(num_inference_steps)
         #mask = torch.where(batch['state_surface']==20,1.0,0.0)        
-
+        # b = batch.copy()
         local_batch = {k:v for k, v in batch.items() if not k.startswith('next')} # ensure no data leakage
         generator = torch.Generator(device='cpu')
         generator.manual_seed(seed)
@@ -703,15 +716,15 @@ class Diffusion(pl.LightningModule):
 
                # local_batch['surface_noisy'] = torch.where(mask==1,100,local_batch['surface_noisy'])
                #  local_batch['surface_noisy'] = remove_outliers(local_batch['surface_noisy'])
-               # steps.append(local_batch['surface_noisy'])
+                #steps.append(local_batch['surface_noisy'])
                 steps.append(local_batch['surface_noisy'])
                 # print(local_batch['surface_noisy'].shape)
                 # print(pred['next_state_surface'].shape)
 
                 #(alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
-               # pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
+                # pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
 
-               # local_batch['surface_noisy'] = (((alpha_prod_t**0.5) * local_batch['surface_noisy']) - vel) /(beta_prod_t**0.5)
+                # local_batch['surface_noisy'] = (((alpha_prod_t**0.5) * local_batch['surface_noisy']) - vel) /(beta_prod_t**0.5)
                 #due to the way the model is set up, the state_surface is modified in the forward loop
                 # print('local_batch',local_batch['state_surface'].shape,local_batch['surface_noisy'].shape)
                 if(self.dataset.flattened_plev):
@@ -726,6 +739,10 @@ class Diffusion(pl.LightningModule):
         if denormalize:
             #sample,batch = self.dataset.denormalize(sample, batch)
             pass
+        if(visualize):
+            steps = torch.stack(steps)
+            print(steps[None,:,0,0,:,:].shape,num_inference_steps)
+            make_gif(steps[None,:,0,0,:,:].cpu().numpy(),num_inference_steps,'noise',f'denoise_process_{seed}',save=True,ffmpeg=True)
         return sample
 
 

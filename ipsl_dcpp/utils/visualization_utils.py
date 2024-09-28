@@ -81,12 +81,16 @@ def make_gif(
     container = []
     vmin = np.nanmin(data)
     vmax = np.nanmax(data)
+    # vmin=-2
+    # vmax=2
     # print(vmin,vmax)
     # print(data.shape)
     # axes[0].set_aspect('equal')
     # axes[1].set_aspect('equal')
-
+    print(data.shape)
     for time_step in range(rollout_length):
+        # print(time_step)
+        # print(data[0][time_step])
         shell.data = data[0][time_step]
         if(denormalized):
             norm = TwoSlopeNorm(vmin=vmin,vcenter = (vmin+vmax)/2,vmax=vmax)
@@ -147,7 +151,7 @@ def make_gif(
     # if(var_num < 10):
     #     plt.title(self.dataset.surface_variables[var_num])
     if(ffmpeg):
-        writer = animation.FFMpegWriter(fps=1)
+        writer = animation.FFMpegWriter(fps=30)
     ani = animation.ArtistAnimation(fig, container)
     # ani.save(f'{out_dir}/diffusion_comparison_{var_names[var_num][0]}_ffmpeg.gif',writer=writer)
 

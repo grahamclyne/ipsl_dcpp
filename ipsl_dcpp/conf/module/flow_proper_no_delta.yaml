@@ -21,7 +21,7 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 150
+  num_inference_steps: 15
   prediction_type: 'v_prediction'
   num_ensemble_members: 1
   num_batch_examples: 1
