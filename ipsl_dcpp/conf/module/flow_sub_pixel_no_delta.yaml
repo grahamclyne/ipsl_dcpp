@@ -1,4 +1,4 @@
-name: flow_sub_pixel_no_delta_no_smoothing
+name: flow_sub_pixel_no_delta
 project: ipsl_diffusion
 surface_variables: ['tas','npp','nbp','gpp','cVeg','evspsbl','mrfso','mrro','ps','tos']
 depth_variables: ['mrsfl','mrsol','mrsll']
@@ -20,7 +20,7 @@ module:
   num_warmup_steps: 500
   num_cycles: 0.5
   num_training_steps: 150000
-  num_inference_steps: 75
+  num_inference_steps: 15
   prediction_type: 'v_prediction'
   num_ensemble_members: 1
   num_batch_examples: 2
@@ -29,6 +29,9 @@ module:
   num_rollout_steps: 15
   elevation: True
   month_embed: True
+  year_embed: True
+  lat_weight: False
+  s_churn: 0
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
@@ -55,4 +58,4 @@ backbone:
   depth_ch: 0
   use_skip: False
   cropped: False
-  smoothing: False
+  smoothing: True

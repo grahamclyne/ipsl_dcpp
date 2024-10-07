@@ -82,18 +82,13 @@ class ForecastModule(pl.LightningModule):
        #                next_state_surface=batch['state_surface']+pred['next_state_surface'],
        #                next_state_depth=batch['state_depth']+pred['next_state_depth'])
         _, _, loss = self.loss(pred, batch)
-       # print('pred',pred)
-       # print('loss',loss)
         self.mylog(loss=loss)
         
      #   loss.backward()
      #   for name, param in self.backbone.named_parameters():
      #       if param.grad is None:
-     #           print(name)
-     #   print('used')
      #   for name, param in self.backbone.named_parameters():
      #       if param.grad is not None:
-     #           print(name)
         return loss
         
         

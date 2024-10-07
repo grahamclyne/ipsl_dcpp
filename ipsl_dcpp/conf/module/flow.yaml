@@ -22,9 +22,15 @@ module:
   num_inference_steps: 10
   prediction_type: 'v_prediction'
   num_ensemble_members: 1
+  num_batch_examples: 1
   p_uncond: 0.0
   scheduler: 'flow'
   num_rollout_steps: 10
+  elevation: False
+  month_embed: True
+  year_embed: True
+  lat_weight: True
+  s_churn: 0
 
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather

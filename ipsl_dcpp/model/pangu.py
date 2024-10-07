@@ -170,7 +170,6 @@ class PanguWeather(nn.Module):
             #     output_dim += (depth_ch * 11)
             # if(self.plev):
             #     output_dim += (level_ch * 19)
-            #print(output_dim)
             self.patchrecovery = PatchRecovery3(input_dim=self.zdim*out_dim, output_dim=self.output_dim,soil=self.soil,plev=self.plev,cropped=self.cropped)
 
         else:
@@ -201,7 +200,6 @@ class PanguWeather(nn.Module):
         #pos_embs = self.positional_embeddings[None].expand((surface.shape[0], *self.positional_embeddings.shape))
         surface = self.patchembed2d(surface)
         x = surface.unsqueeze(2)
-        #print(x.shape,'after unsqueeze,and embedding')
         if(self.soil):
             depth = self.depth_patchembed3d(depth)
             x = torch.concat([x,depth], dim=2)
@@ -225,7 +223,7 @@ class PanguWeather(nn.Module):
         output = x
         #what is zdim here? output channels
         output = output.transpose(1, 2).reshape(output.shape[0], -1, self.zdim, *self.layer1_shape)
-      #  print(output.shape)
+        
         if self.sub_pixel:
             output_surface = output[:, :, 0, :, :]
             output_surface = self.patchrecovery4(output_surface)
@@ -252,13 +250,10 @@ class PanguWeather(nn.Module):
           #      output_upper_air = output[:,:,1:,:,:]
                 output_surface = self.patchrecovery2d(output_surface)
           #      output_level = self.plev_patchrecovery3d(output_upper_air)
-           #     print('after conv head',output_surface.shape)
                 out = dict(latent=latent,
                             next_state_level=torch.empty(0), 
                             next_state_surface=output_surface,
                              next_state_depth=torch.empty(0))              
-               # print('output_surface_shape',output_surface.shape)
-               # print('output_upper_air',output_upper_air.shape)
 
         else:
          #   output_level, output_surface,output_depth = self.patchrecovery(output)
@@ -272,4 +267,5 @@ class PanguWeather(nn.Module):
                         state_depth=torch.empty(0),
                         next_state_surface=output_surface,
                         next_state_depth=output_depth)
+    
         return out

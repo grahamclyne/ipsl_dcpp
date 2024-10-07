@@ -77,26 +77,24 @@ class PatchRecovery2D(nn.Module):
        
     
     # self.conv1 = nn.Conv2d(out_chans,out_chans,(2,1),1) #for making it 143,144
-        # print(img_size, patch_size, in_chans, out_chans)
 
     def forward(self, x):
         output = self.conv(x)
       #  output = self.conv1(output)
-    #    print('output',output.shape)
         _, _, H, W = output.shape
         h_pad = H - self.img_size[0]
         w_pad = W - self.img_size[1]
-        #print(h_pad,w_pad)
         padding_top = h_pad // 2
         padding_bottom = int(h_pad - padding_top)
 
         padding_left = w_pad // 2
         padding_right = int(w_pad - padding_left)
-      #  print(padding_top,padding_bottom,padding_left,padding_right)
-     #   print(output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right].shape)
-    #    return output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right]
-        return output
-       # return output[:,:,1:,:] #aka bottom_crop
+
+        if(self.img_size[0] == 143):
+            return output[:, :, padding_top: H - padding_bottom, padding_left: W - padding_right]
+        else:    #    
+            return output
+        # return output[:,:,1:,:] #aka bottom_crop
       #  return output[:,:,:,:]
 
 class PatchRecovery3D(nn.Module):
@@ -181,22 +179,17 @@ class PatchRecovery3(nn.Module):
         self.output_dim = output_dim
 
     def forward(self, x):
-        #print('before',x.shape)
         #x = x.permute(0, 2, 1)
         #x = x.reshape((x.shape[0], x.shape[1]*Z, H, W))
-     #   print(x.shape)
         x = x.flatten(1, 2)
         x = self.head1(x)
        # if self.downfactor == 4:
        #     x = self.head2(x)
-     #   print('after head',x.shape)
         x = self.proj(x)
         x = self.norm(x)
-     #   print(x.shape)
         #output_surface = x[:, :135]
       #  output = x[:, 135:287].reshape((x.shape[0], 8, 19, *x.shape[-2:]))
       #  output_depth = x[:,287:].reshape((x.shape[0],3,11,*x.shape[-2:]))
-      #  print('after',x.shape)
         if(self.cropped):
             output_surface = x[:,:self.output_dim,:143,:]
         else:

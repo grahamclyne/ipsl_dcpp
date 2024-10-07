@@ -35,11 +35,8 @@ class PatchEmbed2D(nn.Module):
         B, C, H, W = x.shape
         assert H == self.img_size[0] and W == self.img_size[1], \
             f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
-        #print(x)
         x = self.pad(x)
-       # print('after pad',x)
         x = self.proj(x)
-       # print('after proj',x)
         if self.norm is not None:
             x = self.norm(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
         return x

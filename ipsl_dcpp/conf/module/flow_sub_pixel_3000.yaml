@@ -29,7 +29,9 @@ module:
   num_rollout_steps: 40
   elevation: False
   month_embed: True
-
+  year_embed: True
+  lat_weight: False
+  s_churn: 0
 backbone:
   _target_: ipsl_dcpp.model.pangu.PanguWeather
   soil: False

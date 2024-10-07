@@ -47,7 +47,7 @@ backbone:
   num_heads: [6, 12, 12, 6]
   patch_size: [2,2,2]
   two_poles: False
-  window_size: [1, 8, 16]   #how is this working when surface channel is only one? 
+  window_size: [1, 8, 16] 
   depth_multiplier: 2
   position_embs_dim: 0
  # surface_ch: 31

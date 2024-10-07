@@ -190,8 +190,6 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         cur_month_index = int(time.split('-')[-1]) - 1
         
         next_month_index = int(next_time.split('-')[-1]) - 1
-    #    print(next_time)
-   #     print(time)
        # prev_year_index = int(prev_time.split('-')[0]) - 1960
         cur_year_index = int(time.split('-')[0]) - 1960
        # next_year_index = int(next_time.split('-')[0]) - 1960
@@ -200,7 +198,6 @@ class IPSL_DCPP(torch.utils.data.Dataset):
         cur_solar_forcings = torch.Tensor(self.solar_forcings[cur_year_index,cur_month_index])
        # cur_year_forcings = []
       #  cur_year_forcings = []
-     #   print(input_plev_variables.shape,'dataloader')
         if(not self.generate_statistics):
             if(self.normalization == 'climatology'):
                 prev_plev_variables = (prev_plev_variables - self.plev_means[cur_month_index]) / (self.plev_stds[cur_month_index])
@@ -236,9 +233,7 @@ class IPSL_DCPP(torch.utils.data.Dataset):
                 # target_surface_variables = (target_surface_variables - input_surface_variables) / (torch.concatenate([self.surface_delta_stds,self.plev_delta_stds.reshape(8*3,1,1)]))
                 target_surface_variables = (target_surface_variables - input_surface_variables) / self.surface_delta_stds
                 target_plev_variables = (target_plev_variables - input_plev_variables) / self.plev_delta_stds
-                 #   print(self.surface_delta_stds.shape)
                  #   target_depth_variables = (target_depth_variables - input_depth_variables) / self.depth_delta_stds
-                 #   print('after delta',target_surface_variables.shape)
                       #z normalize
               
             if(self.z_normalize):
@@ -253,11 +248,6 @@ class IPSL_DCPP(torch.utils.data.Dataset):
             target_plev_variables = torch.nan_to_num(target_plev_variables,mask_val)
             prev_plev_variables = torch.nan_to_num(prev_plev_variables,mask_val)
                # target_depth_variables = torch.nan_to_num(target_depth_variables,0)
-        # print(prev_plev_variables.shape)
-
-        # print(prev_plev_variables.shape)
-        # print(prev_surface_variables.shape)
-
 
         if(self.flattened_plev):
             v,c,l,w = prev_plev_variables.shape
